@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import os
 import tempfile
 import unittest
@@ -6,6 +7,7 @@ from pathlib import Path
 
 from gateway.config import Platform, PlatformConfig
 from gateway.platform_registry import PlatformEntry, platform_registry
+from gateway.platforms.base import BasePlatformAdapter
 
 from onepm import adapter as onepm_adapter
 from onepm.client import OnepmError
@@ -15,6 +17,8 @@ from onepm.project_sync import ProjectSync
 from onepm.repo_clones import RepositoryClones
 from test_project_sync import FakeProjectClient
 from test_repo_clones import TEMPLATE, FakeGit
+
+_HERMES_KNOWS_BOTS = "is_bot" in inspect.signature(BasePlatformAdapter._is_sender_authorized).parameters
 
 KEY = "opm_" + "s" * 24
 
@@ -184,7 +188,9 @@ class AdapterTest(unittest.TestCase):
         comment = {"id": "c-2", "content": "@bot hi", "userId": "user-2", "user": {"name": "Bat"}}
         client = self.adapter._client = _FakeClient(events, [comment])
         asyncio.run(self.adapter._drain_once())
-        self.assertEqual(checks, [("user-1", "group", "task-1", {"is_bot": True}),
+        # Hermes 0.21.0 has no is_bot; the bot is then checked like a person.
+        bot_extra = {"is_bot": True} if _HERMES_KNOWS_BOTS else {}
+        self.assertEqual(checks, [("user-1", "group", "task-1", bot_extra),
                                   ("user-2", "group", "task-1", {})])
         self.assertEqual(client.fetched, [("task", "task-1"), ("comments", "task-1")])
         self.assertEqual([event.source.user_id for event in self.received], ["user-2"])

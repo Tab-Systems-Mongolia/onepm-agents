@@ -13,7 +13,7 @@ The plugin uses only the Python standard library and `aiohttp`, which ships with
 
 You need:
 
-- Hermes installed, with `hermes gateway` working. These steps assume a Linux server where the Hermes user (here `hermes`) may already run other gateways as `systemd --user` services.
+- Hermes 0.21.0 or later, with `hermes gateway` working. On 0.21.0, plugin versions before 0.4.2 fail to load with `No module named 'gateway.platforms._shared'`; update the plugin or Hermes (`hermes update`). These steps assume a Linux server where the Hermes user (here `hermes`) may already run other gateways as `systemd --user` services.
 - A OnePM agent and its key. In OnePM, open the project's agents, create an agent, and copy the key. OnePM shows the key once. The agent's **Connect** dialog shows these same steps with your agent's handle and your user id filled in.
 - For repositories: Docker as Hermes's terminal backend, and an SSH key for this server user that reaches GitHub.
 

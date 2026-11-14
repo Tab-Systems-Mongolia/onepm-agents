@@ -19,11 +19,10 @@ from typing import Any, Dict, Optional
 import aiohttp
 
 from gateway.config import Platform
-from gateway.platforms._shared import get_scoped_secret
 from gateway.platforms.base import BasePlatformAdapter, SendResult
-from gateway.platforms.event import MessageEvent, MessageType
-from gateway.platforms.helpers import MessageDeduplicator, cancel_task
+from gateway.platforms.helpers import MessageDeduplicator
 
+from .compat import MessageEvent, MessageType, cancel_task, get_scoped_secret, sender_authorized
 from .client import OnepmClient, OnepmError, is_not_found, is_rate_limited
 from .constants import (
     ALLOW_ALL_ENV, ALLOWED_USERS_ENV, BUSY_REFRESH_SECONDS, CURSOR_DIR, CURSOR_FILE, DEDUP_SIZE, DEDUP_TTL_SECONDS, DEFAULT_URL,
@@ -224,8 +223,8 @@ class OnepmAdapter(BasePlatformAdapter):
         actor_id = event.get("actorId")
         if not actor_id or is_trigger(event):
             return False
-        refused = self._is_sender_authorized(
-            str(actor_id), "group", str(event["taskId"]), is_bot=is_agent_actor(event)) is False
+        refused = sender_authorized(
+            self, str(actor_id), "group", str(event["taskId"]), is_bot=is_agent_actor(event)) is False
         if refused:
             # handle_message logs this for other platforms; the refusal here comes first, so say
             # it here: it's how the owner finds an id to add to ONEPM_ALLOWED_USERS.
