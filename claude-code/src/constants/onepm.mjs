@@ -53,6 +53,10 @@ export const NOT_FOUND_STATUS = 404;
 // more often than that, until the reply is posted or a turn has surely ended.
 export const BUSY_REFRESH_MS = 15_000;
 export const BUSY_MAX_MS = 600_000;
+// Tasks the session works on at once, each with its own subagent and worktree.
+export const MAX_PARALLEL_TASKS = 5;
+// A task without a reply gives up its slot after this long.
+export const TASK_SLOT_HOLD_MS = 1_800_000;
 export const COMMENT_MAX_LENGTH = 10_000;
 export const RECENT_COMMENTS = 20;
 export const DROPPED_KEEP = 20;

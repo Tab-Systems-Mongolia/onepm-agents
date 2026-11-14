@@ -29,11 +29,13 @@ import {
   SERVER_VERSION,
 } from "./src/constants/channel.mjs";
 import {
+  MAX_PARALLEL_TASKS,
   POLL_MS,
   PROJECT_CONTEXT_TIMEOUT_MS,
   REMOTE_CONNECT_TIMEOUT_MS,
   REMOTE_RETRY_MS,
   SELF_RETRY_MS,
+  TASK_SLOT_HOLD_MS,
 } from "./src/constants/onepm.mjs";
 import { resolveConfig } from "./src/lib/config.mjs";
 import { errorMessage } from "./src/lib/errorMessage.mjs";
@@ -46,6 +48,7 @@ import {
   createIdleTools,
 } from "./src/services/channelTools.mjs";
 import { createBusyTracker } from "./src/services/busyTracker.mjs";
+import { createTaskSlots } from "./src/services/taskSlots.mjs";
 import { createEventFeed } from "./src/services/eventFeed.mjs";
 import { createOnepmClient } from "./src/services/onepmClient.mjs";
 import { loadProjectContext } from "./src/services/projectContext.mjs";
@@ -83,6 +86,23 @@ const client = idleReason
   : createOnepmClient(config.baseUrl, config.apiKey);
 // Shows people in OnePM that the agent is writing a reply on a task.
 const busy = client ? createBusyTracker({ client, log }) : null;
+// At most MAX_PARALLEL_TASKS tasks in hand at once; a further task's events
+// wait, unread, until one of them is answered or its hold runs out.
+const slots = createTaskSlots({
+  max: MAX_PARALLEL_TASKS,
+  holdMs: TASK_SLOT_HOLD_MS,
+});
+let wakeFeed = () => {};
+// A posted reply ends the busy mark and frees the task's slot.
+const replied = busy
+  ? {
+      stop: (taskId) => {
+        busy.stop(taskId);
+        slots.finish(taskId);
+        wakeFeed();
+      },
+    }
+  : null;
 let self = null;
 // Set once Claude Code has finished the handshake; notifications sent
 // before then are lost.
@@ -148,7 +168,7 @@ const tools = createToolRouter({
         client,
         apiKey: config.apiKey,
         getSelf: () => self,
-        busy,
+        busy: replied,
       }),
   remote,
 });
@@ -192,7 +212,9 @@ const start = async () => {
         params: { content, meta },
       });
       busy.start(meta.chat_id);
+      slots.start(meta.chat_id);
     },
+    admits: (event) => slots.admits(event.taskId),
     log,
   });
   try {
@@ -205,6 +227,7 @@ const start = async () => {
     return;
   }
   const wake = () => void feed.drain();
+  wakeFeed = wake;
   socket = connectAgentSocket({
     baseUrl: config.baseUrl,
     apiKey: config.apiKey,

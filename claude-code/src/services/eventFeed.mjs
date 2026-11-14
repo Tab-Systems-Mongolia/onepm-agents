@@ -37,15 +37,20 @@ export const resolveDetails = async (client, event, self) => {
   return details;
 };
 
+// Set by `handle` for an event `admits` refused: it stays unread for now.
+const HELD = Symbol("held");
+
 // Reads the agent's events from the stored cursor, one at a time, and hands
 // each allowed one to `deliver`. The cursor moves past an event once it is
-// delivered or dropped, so nothing is delivered twice.
+// delivered or dropped, so nothing is delivered twice. An event `admits`
+// refuses stops the reading there, cursor unmoved, until a later drain.
 export const createEventFeed = ({
   client,
   state,
   owner,
   self,
   deliver,
+  admits = () => true,
   log,
 }) => {
   let draining = false;
@@ -76,6 +81,7 @@ export const createEventFeed = ({
       dropped(event, "sender not on the allowlist");
       return;
     }
+    if (!admits(event)) return HELD;
     let details;
     try {
       details = await resolveDetails(client, event, self);
@@ -115,7 +121,7 @@ export const createEventFeed = ({
       for (const event of fresh) {
         // A failed delivery leaves the cursor where it is and stops; the
         // next wake tries the same event again.
-        await handle(event);
+        if ((await handle(event)) === HELD) return;
         advance(event.sequence);
       }
     }

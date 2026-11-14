@@ -137,6 +137,29 @@ see when Claude's turn ends, so it refreshes the mark every 15 seconds for at
 most 10 minutes; a turn that ends without a reply clears 30 seconds after the
 last refresh. An older OnePM without this feature is left alone.
 
+## Several tasks at once
+
+From 0.6.0, one session works on up to 5 tasks at once. The channel delivers
+messages for at most 5 tasks that haven't had a reply yet. A sixth task's
+messages wait unread, and the cursor stays put, so a restart loses nothing,
+until the agent replies on one of the 5 or 30 minutes pass without a reply.
+More messages on a task already in hand always go through.
+
+The server's instructions tell Claude to do two things:
+
+- **Background subagent per task.** Claude handles each task in a background
+  subagent, so the session stays free for the others, and never runs more
+  than 5. A subagent that changes files works in its own git worktree,
+  `.claude/worktrees/onepm-<task key>` on branch `onepm/<task key>`.
+- **Cleanup.** Whenever it takes a new task, Claude removes those worktrees in
+  two cases: the task is resolved or closed, or nothing in the worktree has
+  changed for 7 days. It removes one only when `git status` is clean and every
+  commit is pushed. It never forces a removal; it says in the task what is
+  left.
+
+The worktrees go in the folder the session was started in, so start it at the
+root of the project's repository.
+
 ## Run
 
 ```sh

@@ -52,7 +52,7 @@ const event = (sequence, overrides = {}) => ({
   ...overrides,
 });
 
-const run = async ({ events, access, cursor = 0, task, comments }) => {
+const run = async ({ events, access, cursor = 0, task, comments, admits }) => {
   const state = memoryState(access, cursor);
   const client = fakeClient(events, { task, comments });
   const delivered = [];
@@ -62,6 +62,7 @@ const run = async ({ events, access, cursor = 0, task, comments }) => {
     owner,
     self,
     deliver: async (message) => delivered.push(message),
+    admits,
     log: () => {},
   });
   await feed.drain();
@@ -70,6 +71,26 @@ const run = async ({ events, access, cursor = 0, task, comments }) => {
 
 describe("createEventFeed", () => {
   const allowed = { allowFrom: ["owner-1"], requireMention: true };
+
+  it("holds a task's event while admits refuses it, without moving the cursor past it", async () => {
+    const busyTasks = new Set(["t1"]);
+    const { delivered, state, client } = await run({
+      access: allowed,
+      events: [
+        event(1, { taskId: "t1" }),
+        event(2, { taskId: "t2" }),
+        event(3, { taskId: "t1" }),
+      ],
+      admits: (held) => busyTasks.has(held.taskId),
+    });
+    assert.deepEqual(
+      delivered.map(({ meta }) => meta.chat_id),
+      ["t1"],
+    );
+    assert.equal(state.cursor, 1);
+    // Nothing about the held event is read until it can be delivered.
+    assert.ok(!client.calls.some(([, id]) => id === "t2"));
+  });
 
   it("delivers allowed events with the server's details and moves the cursor", async () => {
     const { delivered, state, client } = await run({
