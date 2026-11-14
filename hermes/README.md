@@ -15,7 +15,7 @@ You need:
 
 - Hermes installed, with `hermes gateway` working. These steps assume a Linux server where the Hermes user (here `hermes`) may already run other gateways as `systemd --user` services.
 - A OnePM agent and its key. In OnePM, open the project's agents, create an agent, and copy the key. OnePM shows the key once. The agent's **Connect** dialog shows these same steps with your agent's handle and your user id filled in.
-- For repositories: Docker as Hermes's terminal backend, and `ssh-agent` on the server.
+- For repositories: Docker as Hermes's terminal backend, and an SSH key for this server user that reaches GitHub.
 
 ## Set up on a Linux server
 
@@ -51,7 +51,6 @@ for kv in \
   "ONEPM_HOME_CHANNEL=off" \
   "ONEPM_WORKSPACE=$HOME/.hermes/profiles/devbot/onepm/repos" \
   "ONEPM_WORKSPACE_IN_SANDBOX=/workspace/repos" \
-  "ONEPM_SSH_DIR=$HOME/.ssh/onepm-agent" \
 ; do
   (umask 077; grep -v "^${kv%%=*}=" "$f" > "$f.new"; echo "$kv" >> "$f.new"; mv "$f.new" "$f")
 done
@@ -67,7 +66,7 @@ Hermes answers only the users in `ONEPM_ALLOWED_USERS` (comma-separated), and it
 
 `ONEPM_HOME_CHANNEL=off` (the plugin's default too) keeps Hermes from posting its "no home channel" notice on a task; set it to a task id if you want cron results delivered there.
 
-The last three lines are for repositories: where the plugin keeps the clones, where the sandbox sees them, and the ssh-agent folder that step 6 mounts.
+The last two lines are for repositories: where the plugin keeps the clones, and where the sandbox sees them.
 
 ### 4. Add the OnePM tools
 
@@ -80,49 +79,23 @@ hermes --profile devbot config set mcp_servers.onepm.headers.Authorization 'Bear
 
 On a self-hosted instance, use its URL followed by `/api/mcp`. Hermes fills in `${ONEPM_AGENT_KEY}` from the profile's `.env`, so the key stays there. The agent's scopes decide what these tools can do.
 
-Steps 5 and 6 let the agent work in the project's repositories (see [Repositories](#repositories)). Skip them if it doesn't need to.
+Step 5 lets the agent work in the project's repositories (see [Repositories](#repositories)). Skip it if it doesn't need to.
 
-### 5. An ssh-agent the sandbox can use
+### 5. Let the sandbox see the clones
 
-These steps assume the `hermes` user already has an SSH key that reaches the repositories on GitHub (`ssh -T git@github.com` greets you by name). Prefer a deploy key or a machine user over your own account's key: whoever holds the ssh-agent can use the key for everything it can reach.
+Add one line to `terminal.docker_volumes` in `~/.hermes/profiles/devbot/config.yaml`, next to the mounts already there:
 
-```sh
-mkdir -p -m 700 ~/.ssh/onepm-agent ~/.config/systemd/user
-ssh-keyscan github.com > ~/.ssh/onepm-agent/known_hosts
-cat > ~/.config/systemd/user/onepm-ssh-agent.service <<'EOF'
-[Unit]
-Description=ssh-agent for the OnePM Hermes gateways
-
-[Service]
-ExecStartPre=/bin/rm -f %h/.ssh/onepm-agent/socket
-ExecStart=/usr/bin/ssh-agent -D -a %h/.ssh/onepm-agent/socket
-ExecStartPost=-/bin/sh -c 'for i in 1 2 3 4 5; do [ -S %h/.ssh/onepm-agent/socket ] && break; sleep 1; done; SSH_AUTH_SOCK=%h/.ssh/onepm-agent/socket ssh-add %h/.ssh/id_ed25519'
-Restart=on-failure
-
-[Install]
-WantedBy=default.target
-EOF
-systemctl --user daemon-reload
-systemctl --user enable onepm-ssh-agent
-systemctl --user restart onepm-ssh-agent
+```yaml
+terminal:
+  docker_volumes:
+    - "${ONEPM_WORKSPACE}:/workspace/repos"
 ```
 
-The socket has a fixed path, so it can be mounted into the sandbox, and the key file itself never is: the agent can ask the ssh-agent to sign, but can't copy the key. Each time the service starts, it loads that one key, so a reboot needs nothing. Anything in the sandbox can use every key in the ssh-agent, so it loads a named file rather than all of the user's keys: make that a deploy key or a machine user's key. For another file, change the path on the `ExecStartPost` line. A key with a passphrase can't be loaded unattended. Check the scanned host keys against [GitHub's published fingerprints](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints). One ssh-agent serves every OnePM profile of this user.
+Hermes fills in `${ONEPM_WORKSPACE}` from the profile's `.env`. Edit the list rather than using `hermes config set terminal.docker_volumes`, which replaces the whole list, and with it whatever your own setup mounts. Mount only the workspace: never `~/.hermes/profiles/devbot/onepm` or its `staging` folder.
 
-### 6. Mount the clones and the ssh-agent into the sandbox
+Git access in the sandbox is whatever you already set up: a cloned profile keeps the default profile's `terminal` settings, such as a mounted SSH key or a token. The gateway clones on the host with this server user's own SSH key (`ssh -T git@github.com` should greet you), and the clones' `origin` is `git@github.com:<owner>/<repo>.git`, so pushing from the sandbox needs SSH there too. For HTTPS, set `ONEPM_GIT_URL_TEMPLATE`. If the sandbox has no git access yet, see [An ssh-agent for the sandbox](#an-ssh-agent-for-the-sandbox).
 
-```sh
-hermes --profile devbot config set terminal.backend docker
-hermes --profile devbot config set terminal.docker_run_as_host_user true
-hermes --profile devbot config set terminal.docker_volumes '["${ONEPM_WORKSPACE}:/workspace/repos", "${ONEPM_SSH_DIR}:/ssh-agent:ro"]'
-hermes --profile devbot config set --force terminal.docker_env '{"SSH_AUTH_SOCK": "/ssh-agent/socket", "GIT_SSH_COMMAND": "ssh -o UserKnownHostsFile=/ssh-agent/known_hosts"}'
-```
-
-This replaces any mounts a cloned profile brought along. Hermes fills in `${…}` from the profile's `.env`; absolute paths work too. The folder with the socket and GitHub's host keys is mounted read-only, and `docker_env` points git in the sandbox at both, so the agent can `git fetch`, `pull` and `push` there. `--force` only hides a notice: Hermes reads `docker_env` but doesn't list it among its known keys. `SSH_AUTH_SOCK` is set with `docker_env` rather than forwarded with `docker_forward_env`, because the socket's path in the sandbox differs from the host's. With `docker_run_as_host_user`, the sandbox runs as `hermes`, so it can use the socket and files it writes belong to `hermes`. Mount only the workspace: never `~/.hermes/profiles/devbot/onepm` or its `staging` folder.
-
-If `git` in the sandbox fails with `No user exists for uid …`, the image has no account for `hermes`'s uid, which ssh needs. Use an image that has one, or add `"/etc/passwd:/etc/passwd:ro"` to `docker_volumes`.
-
-### 7. Run it as a service
+### 6. Run it as a service
 
 ```sh
 hermes --profile devbot gateway install --start-now --start-on-login
@@ -152,7 +125,7 @@ From 0.4.0, the plugin keeps a clone of each GitHub repository linked to the age
 
 The staging folder must never be mounted into the sandbox: git writes there, so the agent must not be able to reach it until the clone is complete. It must be on the same filesystem as the workspace, for the rename; when it isn't, the plugin stages in `.<workspace name>-onepm-staging` next to the workspace instead, so don't mount the workspace's parent either.
 
-From 0.4.1 the gateway never runs git in a clone that already exists, not even `git fetch`. The workspace is mounted into the agent's sandbox, so the agent can change a clone's `.git` (hooks, `core.fsmonitor`, `core.sshCommand`, a symlink); a host-side fetch would then run that on the host as the gateway's user. The agent keeps its clones current itself, from inside the sandbox, through the ssh-agent of steps 7 and 9; its project summary says so.
+From 0.4.1 the gateway never runs git in a clone that already exists, not even `git fetch`. The workspace is mounted into the agent's sandbox, so the agent can change a clone's `.git` (hooks, `core.fsmonitor`, `core.sshCommand`, a symlink); a host-side fetch would then run that on the host as the gateway's user. The agent keeps its clones current itself, from inside the sandbox, with the sandbox's own git access; its project summary says so.
 
 The clone itself runs hardened: git sees only `PATH`, `HOME`, `LANG`, `SSH_AUTH_SOCK` and `GIT_SSH_COMMAND` from the gateway's environment, reads no system or global git config or attributes (`GIT_CONFIG_NOSYSTEM=1`, `GIT_ATTR_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL=/dev/null`), never prompts (`GIT_TERMINAL_PROMPT=0`), and runs with hooks, fsmonitor, submodules and the LFS filter off and only the ssh and https transports allowed. ssh still reads your `~/.ssh/config`, keys and `known_hosts`; without `GIT_SSH_COMMAND` it runs in batch mode, so a missing key or unknown host fails and is logged.
 
@@ -169,6 +142,35 @@ Settings, in the profile's `.env`:
 | `ONEPM_GIT_URL_TEMPLATE` | `git@github.com:{owner}/{repo}.git` | The clone URL. For public repositories without SSH, use `https://github.com/{owner}/{repo}.git`. |
 
 With the settings of step 3, the clones land in `~/.hermes/profiles/devbot/onepm/repos/<owner>__<repo>` on the host, and the agent is told `/workspace/repos/<owner>__<repo>`.
+
+
+### An ssh-agent for the sandbox
+
+Only if the sandbox can't reach GitHub yet. This keeps the key file out of the sandbox: the agent can ask an ssh-agent to sign, but can't copy the key. Use a deploy key or a machine user's key, not your own: anything in the sandbox can use every key in the ssh-agent.
+
+```sh
+mkdir -p -m 700 ~/.ssh/onepm-agent ~/.config/systemd/user
+ssh-keyscan github.com > ~/.ssh/onepm-agent/known_hosts
+cat > ~/.config/systemd/user/onepm-ssh-agent.service <<'EOF'
+[Unit]
+Description=ssh-agent for the OnePM Hermes gateways
+
+[Service]
+ExecStartPre=/bin/rm -f %h/.ssh/onepm-agent/socket
+ExecStart=/usr/bin/ssh-agent -D -a %h/.ssh/onepm-agent/socket
+ExecStartPost=-/bin/sh -c 'for i in 1 2 3 4 5; do [ -S %h/.ssh/onepm-agent/socket ] && break; sleep 1; done; SSH_AUTH_SOCK=%h/.ssh/onepm-agent/socket ssh-add %h/.ssh/id_ed25519'
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+EOF
+systemctl --user daemon-reload
+systemctl --user enable onepm-ssh-agent
+systemctl --user restart onepm-ssh-agent
+hermes --profile devbot config set --force terminal.docker_env '{"SSH_AUTH_SOCK": "/ssh-agent/socket", "GIT_SSH_COMMAND": "ssh -o UserKnownHostsFile=/ssh-agent/known_hosts"}'
+```
+
+Then add `- "/home/hermes/.ssh/onepm-agent:/ssh-agent:ro"` to `terminal.docker_volumes`, with your own home folder. The service loads `~/.ssh/id_ed25519` each time it starts, so a reboot needs nothing; for another file, change the path on the `ExecStartPost` line. A key with a passphrase can't be loaded unattended. Check the scanned host keys against [GitHub's published fingerprints](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints). `--force` only hides a notice: Hermes reads `docker_env` but doesn't list it among its known keys. Set `terminal.docker_run_as_host_user` to `true`, so the sandbox runs as `hermes` and can use the socket. If `git` in the sandbox then fails with `No user exists for uid …`, add `"/etc/passwd:/etc/passwd:ro"` to `docker_volumes`.
 
 ## Test
 
