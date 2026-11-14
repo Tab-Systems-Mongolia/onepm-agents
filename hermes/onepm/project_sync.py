@@ -1,4 +1,4 @@
-"""Reads the agent's project now and then, keeps its repositories cloned, and summarises it.
+"""Reads the agent's project now and then, clones its missing repositories, and summarises it.
 
 A read runs in the background at most once per interval. An event waits a few
 seconds at most for the project to be read, never for git, then is delivered
@@ -74,7 +74,7 @@ class ProjectSync:
         if repository_names(repository) is None or not self._clones.is_cloned(owner, name):
             return RepositoryEntry(owner, name, None)
         if self._sandbox_root:
-            return RepositoryEntry(owner, name, f"{self._sandbox_root}/{owner}/{name}")
+            return RepositoryEntry(owner, name, f"{self._sandbox_root}/{self._clones.path_for(owner, name).name}")
         return RepositoryEntry(owner, name, str(self._clones.path_for(owner, name)))
 
     async def _refresh(self, read_done: asyncio.Event) -> None:

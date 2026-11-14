@@ -1,12 +1,12 @@
 name: onepm
 label: OnePM
 kind: platform
-version: 0.4.0
+version: 0.4.1
 description: >
   OnePM gateway adapter for Hermes Agent. Connects as a OnePM agent: each
   task the agent is mentioned in, assigned to or commented on is a chat,
   and replies are posted as comments on that task. Keeps the project's
-  GitHub repositories cloned and tells the agent about the project. Uses
+  GitHub repositories cloned once and tells the agent about the project. Uses
   aiohttp, which Hermes already ships.
 author: Tab Systems
 requires_env:

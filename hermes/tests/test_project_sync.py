@@ -59,8 +59,8 @@ class ProjectSyncTest(unittest.TestCase):
         clones = RepositoryClones(self.workspace, TEMPLATE, self.git)
         return ProjectSync(client, SELF, clones, sandbox, interval=300, wait=wait, now=self.clock)
 
-    def test_clones_missing_repositories_and_fetches_present_ones(self):
-        (self.workspace / "acme" / "old" / ".git").mkdir(parents=True)
+    def test_clones_missing_repositories_and_leaves_present_ones_alone(self):
+        (self.workspace / "acme__old" / ".git").mkdir(parents=True)
         sync = self._sync(FakeProjectClient([_repo("acme", "new"), _repo("acme", "old")]))
 
         async def run():
@@ -68,10 +68,13 @@ class ProjectSyncTest(unittest.TestCase):
             await sync._task
 
         asyncio.run(run())
-        self.assertEqual([call[0] if call[0] == "clone" else call[2] for call in self.git.calls], ["clone", "fetch"])
+        self.assertEqual(len(self.git.calls), 1)
+        self.assertIn("clone", self.git.calls[0])
+        self.assertTrue((self.workspace / "acme__new" / ".git").is_dir())
         summary = sync.summary()
-        self.assertIn("acme/new at /workspace/projects/acme/new, acme/old at /workspace/projects/acme/old", summary)
-        self.assertIn('done "Done" (final)', summary)
+        self.assertIn('"acme/new" at "/workspace/projects/acme__new", "acme/old" at "/workspace/projects/acme__old"',
+                      summary)
+        self.assertIn('"done" "Done" (final)', summary)
 
     def test_without_a_sandbox_path_the_agent_gets_the_host_path(self):
         sync = self._sync(FakeProjectClient([_repo("acme", "api")]), sandbox=None)
@@ -81,10 +84,10 @@ class ProjectSyncTest(unittest.TestCase):
             await sync._task
 
         asyncio.run(run())
-        self.assertIn(f"acme/api at {self.workspace / 'acme' / 'api'}", sync.summary())
+        self.assertIn(f'"acme/api" at "{self.workspace / "acme__api"}"', sync.summary())
 
     def test_unusual_names_are_listed_but_never_cloned(self):
-        client = FakeProjectClient([_repo("..", "x"), _repo("a", "b c"), _repo("acme", "api")])
+        client = FakeProjectClient([_repo("..", "x"), _repo("a", "b c"), _repo("acme", ".git"), _repo("acme", "api")])
         sync = self._sync(client)
 
         async def run():
@@ -94,9 +97,10 @@ class ProjectSyncTest(unittest.TestCase):
         with self.assertLogs("onepm.project_sync", "WARNING"):
             asyncio.run(run())
         self.assertEqual(len(self.git.calls), 1)
-        self.assertIn("acme/api", self.git.calls[0][3])
-        self.assertIn("../x (no local copy)", sync.summary())
-        self.assertIn("a/b c (no local copy)", sync.summary())
+        self.assertIn("git@github.com:acme/api.git", self.git.calls[0])
+        self.assertIn('"../x" (no local copy)', sync.summary())
+        self.assertIn('"a/b c" (no local copy)', sync.summary())
+        self.assertIn('"acme/.git" (no local copy)', sync.summary())
         self.assertFalse((Path(self._dir.name) / "x").exists())
 
     def test_syncs_at_most_ten_repositories(self):
@@ -148,5 +152,5 @@ class ProjectSyncTest(unittest.TestCase):
 
         with self.assertLogs("onepm.project_sync", "WARNING"):
             asyncio.run(run())
-        self.assertNotIn("Statuses", sync.summary())
-        self.assertIn("- GitHub repositories: none", sync.summary())
+        self.assertNotIn("statuses", sync.summary())
+        self.assertIn("\nGitHub repositories: none\n", sync.summary())

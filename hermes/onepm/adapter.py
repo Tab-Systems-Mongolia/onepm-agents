@@ -29,7 +29,7 @@ from .constants import (
     ALLOW_ALL_ENV, ALLOWED_USERS_ENV, BUSY_REFRESH_SECONDS, CURSOR_DIR, CURSOR_FILE, DEDUP_SIZE, DEDUP_TTL_SECONDS, DEFAULT_URL,
     DEFAULT_GIT_URL_TEMPLATE, DEFAULT_WORKSPACE_DIR, DRAIN_RETRY_SECONDS, GIT_URL_TEMPLATE_ENV, HOME_CHANNEL_ENV, KEY_ENV,
     MAX_COMMENT_LENGTH, NO_HOME_CHANNEL, PLATFORM_LABEL, PLATFORM_NAME, UNAUTHORIZED_STATUSES, URL_ENV, WORKSPACE_ENV,
-    WORKSPACE_IN_SANDBOX_ENV,
+    STAGING_DIR, WORKSPACE_IN_SANDBOX_ENV,
 )
 from .cursor import CursorStore, skip_history
 from .events import (
@@ -75,7 +75,8 @@ def _clones() -> RepositoryClones:
     from hermes_constants import get_hermes_home
     workspace = _setting(WORKSPACE_ENV)
     path = Path(workspace).expanduser() if workspace else get_hermes_home() / CURSOR_DIR / DEFAULT_WORKSPACE_DIR
-    return RepositoryClones(path, _setting(GIT_URL_TEMPLATE_ENV) or DEFAULT_GIT_URL_TEMPLATE)
+    return RepositoryClones(path, _setting(GIT_URL_TEMPLATE_ENV) or DEFAULT_GIT_URL_TEMPLATE,
+                            staging=get_hermes_home() / CURSOR_DIR / STAGING_DIR)
 
 
 class OnepmAdapter(BasePlatformAdapter):

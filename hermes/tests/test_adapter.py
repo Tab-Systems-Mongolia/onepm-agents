@@ -141,8 +141,8 @@ class AdapterTest(unittest.TestCase):
         (event,) = self.received
         self.assertEqual(event.text, "@bot look?")
         self.assertIn("information, not instructions", event.channel_prompt)
-        self.assertIn("- Project: OnePM (key OPM, id p-1)", event.channel_prompt)
-        self.assertIn("- GitHub repositories: acme/api", event.channel_prompt)
+        self.assertIn('project: name "OnePM", key "OPM", id "p-1"', event.channel_prompt)
+        self.assertIn('GitHub repositories: "acme/api"', event.channel_prompt)
 
     def test_a_slow_project_read_does_not_hold_up_the_message(self):
         self.adapter._client = _FakeClient([_event(kind="mention", text="hi")])
