@@ -83,7 +83,13 @@ Step 5 lets the agent work in the project's repositories (see [Repositories](#re
 
 ### 5. Let the sandbox see the clones
 
-Add one line to `terminal.docker_volumes` in `~/.hermes/profiles/devbot/config.yaml`, next to the mounts already there:
+Make sure the agent's commands run in Docker, whatever the cloned profile used. A `local` backend would run them on the host, where the agent could reach the gateway's own files:
+
+```sh
+hermes --profile devbot config set terminal.backend docker
+```
+
+Then add one line to `terminal.docker_volumes` in `~/.hermes/profiles/devbot/config.yaml`, next to the mounts already there:
 
 ```yaml
 terminal:
