@@ -1,0 +1,20 @@
+{
+	"$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+	"name": "onepm",
+	"description": "Claude Code plugins for OnePM, the self-hosted project manager by Tab Systems Mongolia.",
+	"owner": {
+		"name": "Tab Systems Mongolia"
+	},
+	"plugins": [
+		{
+			"name": "onepm",
+			"description": "OnePM channel: your agent's mentions, assignments and task comments arrive in Claude Code, and replies post as task comments.",
+			"author": {
+				"name": "Tab Systems Mongolia"
+			},
+			"source": "./claude-code",
+			"category": "productivity",
+			"homepage": "https://github.com/Tab-Systems-Mongolia/onepm-agents/tree/main/claude-code"
+		}
+	]
+}

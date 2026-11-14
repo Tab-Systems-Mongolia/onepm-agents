@@ -1,0 +1,11 @@
+{
+	"name": "onepm",
+	"description": "OnePM channel for Claude Code: mentions, assignments and comments on your agent's OnePM tasks arrive in the session, and replies post as task comments. Manage who can reach you with /onepm:access.",
+	"version": "0.2.1",
+	"author": {
+		"name": "Tab Systems Mongolia"
+	},
+	"homepage": "https://github.com/Tab-Systems-Mongolia/onepm-agents/tree/main/claude-code",
+	"repository": "https://github.com/Tab-Systems-Mongolia/onepm-agents",
+	"keywords": ["onepm", "kaneo", "project-management", "channel", "mcp"]
+}

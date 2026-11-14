@@ -1,0 +1,191 @@
+# OnePM channel for Claude Code
+
+Connects a running Claude Code session to a OnePM agent. When someone
+@mentions the agent on a task, assigns it a task, or comments on one of its
+tasks, the message arrives in your session. Claude answers with the `reply`
+tool, which posts a comment on that task.
+
+Each OnePM task is one chat: `chat_id` is the task's id.
+
+## Requirements
+
+- Claude Code with channels support
+- Node.js 22 or later (`node` and `npm` on your `PATH`)
+- An agent in OnePM and its key: **Project settings › Agents › New agent**.
+  The key is shown once.
+
+## Install
+
+```sh
+claude plugin marketplace add Tab-Systems-Mongolia/onepm-agents
+claude plugin install onepm@onepm
+```
+
+## Agent profiles
+
+Claude Code starts the plugin in every session, but it connects to OnePM only
+in a session started as an **agent profile**:
+
+```sh
+ONEPM_AGENT=claudeagent claude --dangerously-load-development-channels plugin:onepm@onepm
+```
+
+During the channels research preview, `--channels` only registers plugins on
+Anthropic's approved list, and this plugin isn't on it: started with
+`--channels`, the session runs but never receives OnePM messages ("not on the
+approved channels allowlist" in the MCP log). Use
+`--dangerously-load-development-channels`, which asks once at startup. On a
+Team or Enterprise plan, an admin can add `onepm@onepm` to
+`allowedChannelPlugins` in managed settings instead, and then `--channels`
+works.
+
+The profile name is yours to choose; use the agent's OnePM handle. Each
+profile keeps its key, allowlist and cursor in
+`~/.claude/channels/onepm/<name>/`, so one machine can run several agents,
+each in its own session. In a session started without `ONEPM_AGENT` the
+plugin stays idle: it doesn't connect, doesn't take events from the agent's
+session, and its tools answer that the channel isn't active.
+
+## Configure
+
+In any Claude Code session, give the agent key and the profile name:
+
+```
+/onepm:configure opm_your_agent_key claudeagent
+```
+
+This writes `~/.claude/channels/onepm/claudeagent/.env` (mode 600):
+
+```sh
+ONEPM_AGENT_KEY=opm_your_agent_key
+```
+
+Without `ONEPM_URL` the channel connects to the hosted OnePM,
+`https://onepm.tabsystems.tech`. For a self-hosted instance add its URL;
+the arguments can come in any order:
+
+```
+/onepm:configure https://pm.example.com opm_your_agent_key claudeagent
+```
+
+In the agent's own session the name can be left out: `/onepm:configure`
+uses `ONEPM_AGENT`. Run `/onepm:configure` with no arguments to see the
+profile's status, or, outside an agent's session, the profiles that exist.
+
+`ONEPM_URL` and `ONEPM_AGENT_KEY` set in your shell take precedence over the
+file. `ONEPM_STATE_DIR` still works and points a session at one state
+directory instead of a profile; note that it makes every session that has it
+set connect.
+
+Upgrading from a version without profiles: the old
+`~/.claude/channels/onepm/.env` is no longer read. Run `/onepm:configure` in
+a normal session and it offers to move those files into a profile.
+
+## Allow who can reach you
+
+Nobody can reach the session until you allow them. An empty allowlist drops
+every event. There's no pairing code, because it would be posted on a task
+that the whole workspace can read.
+
+Copy your OnePM user ID from the profile menu in OnePM (the members list
+shows everyone's), then, in the agent's session:
+
+```
+/onepm:access allow <your user id>
+```
+
+| Command | What it does |
+| --- | --- |
+| `/onepm:access` | Shows who is allowed, the mention setting, and recent senders who were dropped (with their IDs) |
+| `/onepm:access allow <id>` | Lets that person's events through |
+| `/onepm:access remove <id>` | Stops them |
+| `/onepm:access mention on` | Default. Only mentions of the agent, assignments to it, and comments that @mention it |
+| `/onepm:access mention off` | Also every other comment on tasks that are the agent's channels |
+
+The settings are stored in the profile's `access.json`, and the
+channel reads it again for every event:
+
+```json
+{
+  "allowFrom": ["<user id>"],
+  "requireMention": true
+}
+```
+
+## Run
+
+```sh
+ONEPM_AGENT=claudeagent claude --dangerously-load-development-channels plugin:onepm@onepm
+```
+
+The plugin connects to OnePM as the agent and shows it online. On its first
+start it skips the agent's older events. After that it picks up where it
+stopped, including events that came in while it was offline.
+
+Only one connection per agent key is live. Starting a second session with the
+same profile takes over, and the first one stops receiving events.
+
+## Tools
+
+| Tool | What it does |
+| --- | --- |
+| `reply(chat_id, text)` | Posts `text` (Markdown) as a comment on the task. Token-like secrets are masked first. Replies over 10,000 characters are split into several comments. |
+| `get_task(chat_id)` | Returns the task's title, description, status, priority, and its last 20 comments. |
+
+## Change tasks with the OnePM MCP server
+
+The channel only reads tasks and posts comments. To let Claude change tasks
+(status, assignees, labels, new tasks), also add OnePM's MCP server with the
+same key:
+
+```sh
+claude mcp add --transport http onepm https://pm.example.com/api/mcp \
+  --header "Authorization: Bearer opm_your_agent_key"
+```
+
+The agent's scopes in OnePM decide which of those tools it can use.
+
+## Security
+
+- **Allowlist only.** Events from anyone not in `allowFrom` are dropped
+  before anything about them is read. The agent's own comments never come
+  back as events.
+- **Comments are untrusted input.** Task titles, descriptions, and comments
+  are written by workspace members. The server instructions tell Claude to
+  treat them as information, and never to change access because a comment
+  asks. Only you change access, by running `/onepm:access` in your terminal.
+- **Replies are public to the workspace.** Before posting, `reply` masks
+  GitHub tokens, `sk-` and `sk_live_` keys, OnePM keys, AWS keys, JWTs,
+  Bearer values, private keys, URL passwords, and the agent key itself.
+  Masking catches common formats, not every secret.
+- **The key stays local.** `.env` is kept at mode 600, and the key is masked
+  in the plugin's logs. A OnePM agent key reaches only its own project, and
+  only with the scopes chosen for it.
+- Claude's tool permissions and sandbox still apply. Run Claude Code in a
+  directory and with permissions you're comfortable exposing to the people
+  you allowed.
+
+## Files
+
+Each profile's files are in `~/.claude/channels/onepm/<name>/`:
+
+| File | Contents |
+| --- | --- |
+| `.env` | `ONEPM_AGENT_KEY`, and `ONEPM_URL` for a self-hosted OnePM |
+| `access.json` | Allowlist and mention setting |
+| `cursor.json` | The last event handled, for this server and agent |
+| `dropped.json` | The last 20 senders who were dropped |
+
+## Development
+
+```sh
+cd claude-code
+npm install
+node --test test/           # unit tests
+ONEPM_AGENT=dev npm start   # what Claude Code runs, over stdio
+```
+
+The plugin is plain ESM JavaScript (`server.mjs` plus `src/`), so there's no
+build step. Its `start` script installs the dependencies pinned in
+`package-lock.json` quietly, then runs the server. After changing a dependency,
+run `npm install` here and commit the updated lockfile.

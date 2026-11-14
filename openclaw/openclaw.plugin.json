@@ -1,0 +1,55 @@
+{
+	"id": "onepm",
+	"name": "OnePM",
+	"description": "OnePM tasks as an OpenClaw channel for a project agent",
+	"categories": ["channels"],
+	"activation": {
+		"onStartup": false
+	},
+	"channels": ["onepm"],
+	"configSchema": {
+		"type": "object",
+		"additionalProperties": false,
+		"properties": {}
+	},
+	"channelConfigs": {
+		"onepm": {
+			"label": "OnePM",
+			"description": "A OnePM project agent: its tasks are group chats.",
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"enabled": { "type": "boolean" },
+					"name": { "type": "string" },
+					"url": { "type": "string" },
+					"agentKey": { "type": "string" },
+					"allowFrom": {
+						"type": "array",
+						"items": { "type": ["string", "number"] }
+					},
+					"requireMention": { "type": "boolean" }
+				}
+			},
+			"uiHints": {
+				"url": {
+					"label": "OnePM address",
+					"help": "Only for a self-hosted instance, e.g. https://onepm.example.com (no /api). Leave empty for https://onepm.tabsystems.tech"
+				},
+				"agentKey": {
+					"label": "Agent key",
+					"help": "The key shown when the agent was created or re-keyed",
+					"sensitive": true
+				},
+				"allowFrom": {
+					"label": "Allowed OnePM user ids",
+					"help": "Only these people reach the agent; copy an id from the profile menu or the members list"
+				},
+				"requireMention": {
+					"label": "Require a mention",
+					"help": "On: only mentions, assignments and comments that mention the agent. Off: every comment on its tasks"
+				}
+			}
+		}
+	}
+}

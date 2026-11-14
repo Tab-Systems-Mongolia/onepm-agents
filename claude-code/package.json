@@ -1,0 +1,18 @@
+{
+  "name": "claude-channel-onepm",
+  "version": "0.2.1",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "bin": "./server.mjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "npm install --silent --no-audit --no-fund --omit=dev 1>&2 && node server.mjs",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2"
+  }
+}

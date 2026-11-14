@@ -1,0 +1,8 @@
+{
+	"mcpServers": {
+		"onepm": {
+			"command": "npm",
+			"args": ["--prefix", "${CLAUDE_PLUGIN_ROOT}", "--silent", "run", "start"]
+		}
+	}
+}

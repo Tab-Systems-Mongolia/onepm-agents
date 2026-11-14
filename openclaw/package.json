@@ -1,0 +1,42 @@
+{
+  "name": "openclaw-channel-onepm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OnePM channel for OpenClaw: a project agent's tasks as group chats",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.11.3"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.mjs"
+    ],
+    "setupEntry": "./setupEntry.mjs",
+    "compat": {
+      "pluginApi": ">=2026.11.3",
+      "minGatewayVersion": "2026.11.3"
+    },
+    "channel": {
+      "id": "onepm",
+      "label": "OnePM",
+      "selectionLabel": "OnePM (project agent key)",
+      "detailLabel": "OnePM",
+      "blurb": "OnePM tasks as group chats: mentions, assignments and comments.",
+      "configuredState": {
+        "env": {
+          "allOf": [
+            "ONEPM_URL",
+            "ONEPM_AGENT_KEY"
+          ]
+        }
+      }
+    }
+  }
+}
