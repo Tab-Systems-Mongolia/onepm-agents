@@ -96,7 +96,7 @@ Description=ssh-agent for the OnePM Hermes gateways
 [Service]
 ExecStartPre=/bin/rm -f %h/.ssh/onepm-agent/socket
 ExecStart=/usr/bin/ssh-agent -D -a %h/.ssh/onepm-agent/socket
-ExecStartPost=-/bin/sh -c 'for i in 1 2 3 4 5; do [ -S %h/.ssh/onepm-agent/socket ] && break; sleep 1; done; SSH_AUTH_SOCK=%h/.ssh/onepm-agent/socket ssh-add'
+ExecStartPost=-/bin/sh -c 'for i in 1 2 3 4 5; do [ -S %h/.ssh/onepm-agent/socket ] && break; sleep 1; done; SSH_AUTH_SOCK=%h/.ssh/onepm-agent/socket ssh-add %h/.ssh/id_ed25519'
 Restart=on-failure
 
 [Install]
@@ -107,7 +107,7 @@ systemctl --user enable onepm-ssh-agent
 systemctl --user restart onepm-ssh-agent
 ```
 
-The socket has a fixed path, so it can be mounted into the sandbox, and the key file itself never is: the agent can ask the ssh-agent to sign, but can't copy the key. Each time the service starts, it loads the user's default keys (`~/.ssh/id_ed25519`, `id_rsa` and so on), so a reboot needs nothing. For a key with another name, put its path after `ssh-add`; a key with a passphrase can't be loaded unattended. Check the scanned host keys against [GitHub's published fingerprints](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints). One ssh-agent serves every OnePM profile of this user.
+The socket has a fixed path, so it can be mounted into the sandbox, and the key file itself never is: the agent can ask the ssh-agent to sign, but can't copy the key. Each time the service starts, it loads that one key, so a reboot needs nothing. Anything in the sandbox can use every key in the ssh-agent, so it loads a named file rather than all of the user's keys: make that a deploy key or a machine user's key. For another file, change the path on the `ExecStartPost` line. A key with a passphrase can't be loaded unattended. Check the scanned host keys against [GitHub's published fingerprints](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints). One ssh-agent serves every OnePM profile of this user.
 
 ### 6. Mount the clones and the ssh-agent into the sandbox
 
