@@ -8,6 +8,7 @@ import {
   formatEvent,
   ingressPolicy,
 } from "../lib/eventMessage.mjs";
+import { dispatchTurn } from "../services/dispatchTurn.mjs";
 import { getOnepmRuntime } from "./runtime.mjs";
 
 // The sender is the event's actorId: the OnePM server, reached with the
@@ -169,36 +170,41 @@ export const handleOnepmInbound = async ({
     },
     extra: { GroupSubject: message.chatLabel },
   });
-  await core.channel.inbound.dispatch({
-    cfg,
-    channel: CHANNEL_ID,
-    accountId: account.accountId,
-    route: { agentId: route.agentId, sessionKey: route.sessionKey },
-    ctxPayload,
-    delivery: {
-      deliver: async (payload) => {
-        const text = [payload.text, ...(payload.mediaUrls ?? [])]
-          .filter(Boolean)
-          .join("\n\n");
-        if (!text.trim()) return;
-        await postReply(message.chatId, text);
-        statusSink?.({ lastOutboundAt: Date.now() });
+  const dispatch = () =>
+    core.channel.inbound.dispatch({
+      cfg,
+      channel: CHANNEL_ID,
+      accountId: account.accountId,
+      route: { agentId: route.agentId, sessionKey: route.sessionKey },
+      ctxPayload,
+      delivery: {
+        deliver: async (payload) => {
+          const text = [payload.text, ...(payload.mediaUrls ?? [])]
+            .filter(Boolean)
+            .join("\n\n");
+          if (!text.trim()) return;
+          await postReply(message.chatId, text);
+          statusSink?.({ lastOutboundAt: Date.now() });
+        },
+        onError: (error, info) => {
+          log(
+            `${info?.kind ?? "reply"} to task ${message.chatId} failed: ${String(error)}`,
+          );
+        },
       },
-      onError: (error, info) => {
-        log(
-          `${info?.kind ?? "reply"} to task ${message.chatId} failed: ${String(error)}`,
-        );
+      // OnePM shows the agent replying on the task while the turn runs.
+      replyPipeline: typing ? { typing } : {},
+      replyOptions: {},
+      record: {
+        onRecordError: (error) => {
+          log(`couldn't update session meta: ${String(error)}`);
+        },
       },
-    },
-    // OnePM shows the agent replying on the task while the turn runs.
-    replyPipeline: typing ? { typing } : {},
-    replyOptions: {},
-    record: {
-      onRecordError: (error) => {
-        log(`couldn't update session meta: ${String(error)}`);
-      },
-    },
+    });
+  await dispatchTurn({
+    dispatch,
+    log,
+    label: `${event.kind} ${event.id} on ${message.chatLabel}`,
   });
-  log(`delivered ${event.kind} ${event.id} on ${message.chatLabel}`);
   return { dispatched: true };
 };
