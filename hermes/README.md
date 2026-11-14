@@ -104,17 +104,26 @@ Git access in the sandbox is whatever you already set up: a cloned profile keeps
 ### 6. Run it as a service
 
 ```sh
-hermes --profile devbot gateway install --start-now --start-on-login
+if hermes config get gateway.multiplex_profiles 2>/dev/null | grep -qx true; then
+  hermes gateway list
+else
+  hermes --profile devbot gateway install --start-now --start-on-login
+fi
 loginctl show-user "$USER" --property=Linger
 ```
 
-Hermes writes and starts its own `systemd --user` unit, `hermes-gateway-devbot`. The gateway clones with this user's SSH key. `Linger=yes` keeps the service running after you log out; if it says `Linger=no`, run `sudo loginctl enable-linger hermes`.
+How the gateway runs depends on the host:
 
-Check it with `journalctl --user -u hermes-gateway-devbot -f`. The log shows `OnePM: connected to <url> as @devbot`, and `hermes --profile devbot status` lists `OnePM` under Platforms.
+- **One gateway for every profile (Hermes 0.23 and later).** `hermes update` can switch a host to multiplex mode: it sets `gateway.multiplex_profiles: true` in `~/.hermes/config.yaml` and removes the per-profile `systemd` units. The default profile's gateway (`hermes-gateway`) then picks up a new profile by itself within 30 seconds, and refuses a separate `gateway install` for it. The block above only lists the profiles, so you can see `devbot` served by that gateway. Its log is `journalctl --user -u hermes-gateway -f`. To fold an existing per-profile host onto one gateway, run `hermes gateway migrate --multiplex` (`--dry-run` shows the plan first).
+- **One gateway per profile (older Hermes, or a host that hasn't switched).** Hermes writes and starts the profile's own `systemd --user` unit, `hermes-gateway-devbot`. Its log is `journalctl --user -u hermes-gateway-devbot -f`.
+
+The gateway clones with this user's SSH key. `Linger=yes` keeps the service running after you log out; if it says `Linger=no`, run `sudo loginctl enable-linger hermes`.
+
+The log shows `OnePM: connected to <url> as @devbot`, and `hermes --profile devbot status` lists `OnePM` under Platforms.
 
 On its first start, the plugin skips the agent's earlier events and answers only new ones. It saves its place in `~/.hermes/profiles/devbot/onepm/cursor.json`, so a restart picks up the events that arrived while the gateway was down. If you change the key or the server, the plugin starts fresh.
 
-If another session connects with the same agent key, or you rotate the key, OnePM closes this connection and the plugin stays offline. Replace the `ONEPM_AGENT_KEY` line in the profile's `.env` and run `hermes --profile devbot gateway restart`.
+If another session connects with the same agent key, or you rotate the key, OnePM closes this connection and the plugin stays offline. Replace the `ONEPM_AGENT_KEY` line in the profile's `.env` and run `hermes --profile devbot gateway restart`, or `hermes gateway restart` when one gateway serves every profile.
 
 ## Triggers
 
