@@ -21,6 +21,17 @@ export const PRIVATE_FILE_MODE = 0o600;
 export const PRIVATE_DIR_MODE = 0o700;
 
 export const API_KEY_HEADER = "x-api-key";
+// OnePM's MCP endpoint, which takes the agent key as a Bearer token and holds
+// every tool call to the key's project and scopes.
+export const MCP_PATH = "/api/mcp";
+export const MCP_CLIENT_NAME = "onepm-channel";
+// How long the server waits for the project summary before it starts
+// without one, and for a connection to OnePM's tools.
+export const PROJECT_CONTEXT_TIMEOUT_MS = 3000;
+export const REMOTE_CONNECT_TIMEOUT_MS = 5000;
+// After a failed connection, OnePM's tools are tried again no sooner than
+// this, on the next tool list or call.
+export const REMOTE_RETRY_MS = 30_000;
 export const AGENT_SOCKET_PATH = "/api/ws/agent";
 export const AGENT_EVENT_MESSAGE = "AGENT_EVENT";
 // The server closes an older connection with this code when a newer one

@@ -132,18 +132,38 @@ same profile takes over, and the first one stops receiving events.
 | `reply(chat_id, text)` | Posts `text` (Markdown) as a comment on the task. Token-like secrets are masked first. Replies over 10,000 characters are split into several comments. |
 | `get_task(chat_id)` | Returns the task's title, description, status, priority, and its last 20 comments. |
 
-## Change tasks with the OnePM MCP server
+### OnePM's tools come with the plugin
 
-The channel only reads tasks and posts comments. To let Claude change tasks
-(status, assignees, labels, new tasks), also add OnePM's MCP server with the
-same key:
+In an agent's session the plugin also serves OnePM's own MCP tools (listing
+and changing tasks, statuses, assignees, labels, milestones and more). It
+connects to `<ONEPM_URL>/api/mcp` with the agent key, so there's no separate
+`claude mcp add` step. The tools act as the agent, inside its project, and the
+scopes chosen for the agent in OnePM decide which calls succeed; the rest come
+back as errors.
 
-```sh
-claude mcp add --transport http onepm https://pm.example.com/api/mcp \
-  --header "Authorization: Bearer opm_your_agent_key"
-```
+- If OnePM can't be reached when the session starts, the channel's own tools
+  still work and the plugin logs why. It tries again on a later tool list or
+  call (at most every 30 seconds) and tells Claude Code when OnePM's tools
+  arrive.
+- OnePM's `get_task` has the same name as the channel's, so the channel's is
+  kept and OnePM's isn't listed. Both read a task with the same key.
 
-The agent's scopes in OnePM decide which of those tools it can use.
+The server instructions also carry a short summary of the agent's project:
+its name and key, the board's statuses in order, and its GitHub repositories
+(the first 10). The plugin reads it with the agent key when the session
+starts and waits at most 3 seconds; without it, the session starts with the
+plain instructions.
+
+**Don't use your personal OnePM MCP server in an agent's session.** If you
+added OnePM's MCP server to Claude Code with your own login or API key, it
+acts as you, across every project you can reach, and ignores the agent's
+scopes. The instructions tell Claude to use only this plugin's tools for
+OnePM; to be sure, remove the personal server from the agent's working
+directory or run the agent under a separate Claude Code configuration.
+
+Upgrading from 0.2: if you followed the old setup and added OnePM's MCP server
+with the agent key (`claude mcp add ... onepm .../api/mcp`), remove it with
+`claude mcp remove onepm`. The plugin serves the same tools now.
 
 ## Security
 
@@ -160,7 +180,8 @@ The agent's scopes in OnePM decide which of those tools it can use.
   Masking catches common formats, not every secret.
 - **The key stays local.** `.env` is kept at mode 600, and the key is masked
   in the plugin's logs. A OnePM agent key reaches only its own project, and
-  only with the scopes chosen for it.
+  only with the scopes chosen for it. The key goes only to the `ONEPM_URL`
+  you configured, both for events and for OnePM's tools.
 - Claude's tool permissions and sandbox still apply. Run Claude Code in a
   directory and with permissions you're comfortable exposing to the people
   you allowed.

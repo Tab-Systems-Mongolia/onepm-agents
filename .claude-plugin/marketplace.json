@@ -8,7 +8,7 @@
 	"plugins": [
 		{
 			"name": "onepm",
-			"description": "OnePM channel: your agent's mentions, assignments and task comments arrive in Claude Code, and replies post as task comments.",
+			"description": "OnePM channel: your agent's mentions, assignments and task comments arrive in Claude Code, replies post as task comments, and OnePM's tools work as the agent in its project.",
 			"author": {
 				"name": "Tab Systems Mongolia"
 			},

@@ -21,7 +21,12 @@ export const createOnepmClient = (baseUrl, apiKey, fetchImpl = fetch) => {
   const id = (value) => encodeURIComponent(value);
 
   return {
-    self: () => request("/project-agent/self"),
+    // init carries an optional abort signal.
+    self: (init) => request("/project-agent/self", init),
+    project: (projectId, init) => request(`/project/${id(projectId)}`, init),
+    columns: (projectId, init) => request(`/column/${id(projectId)}`, init),
+    repositories: (projectId, init) =>
+      request(`/github-repository/project/${id(projectId)}`, init),
     events: (after) =>
       request(
         `/project-agent/events${after === null ? "" : `?after=${after}`}`,
