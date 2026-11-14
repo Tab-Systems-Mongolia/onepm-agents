@@ -86,13 +86,15 @@ def _status_text(event: dict) -> str:
 
 
 def _pull_request_text(event: dict) -> str:
+    # Only what OnePM knows. A trigger is vouched for, so the title and branch an
+    # older server sent (written by whoever opened the pull request) never show.
     pull = event.get("pullRequest") or {}
     if not pull.get("number"):
         return "A pull request linked to this task changed."
     where = f" ({pull['repository']})" if pull.get("repository") else ""
     what = PULL_REQUEST_ACTION_TEXT.get(pull.get("action"), pull.get("action") or "changed")
-    lines = [f"Pull request #{pull['number']}{where} {what}" + (f": {pull['title']}" if pull.get("title") else ".")]
-    lines += [line for line in (pull.get("url"), pull.get("branch") and f"Branch: {pull['branch']}") if line]
+    lines = [f"Pull request #{pull['number']}{where} {what}."]
+    lines += [pull["url"]] if pull.get("url") else []
     return "\n".join(lines)
 
 

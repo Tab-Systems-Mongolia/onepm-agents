@@ -109,15 +109,17 @@ const statusLines = (event, actorName) => {
   return [actorName ? `${actorName} moved it ${route}.` : `It moved ${route}.`];
 };
 
+// Only what OnePM knows. A trigger skips the allowlist, so the title and
+// branch an older server sent (written by whoever opened the pull request)
+// are never shown.
 const pullRequestLines = ({ pullRequest }) => {
   if (!pullRequest) return ["A linked pull request changed."];
   const where = pullRequest.repository ? ` (${pullRequest.repository})` : "";
   const what =
     PULL_REQUEST_ACTION_TEXT[pullRequest.action] ?? pullRequest.action;
   return [
-    `Pull request #${pullRequest.number}${where} ${what}${pullRequest.title ? `: ${pullRequest.title}` : "."}`,
+    `Pull request #${pullRequest.number}${where} ${what}.`,
     pullRequest.url,
-    ...(pullRequest.branch ? [`Branch: ${pullRequest.branch}`] : []),
   ].filter(Boolean);
 };
 

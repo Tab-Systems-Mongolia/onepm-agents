@@ -122,6 +122,12 @@ request being opened, merged or closed. These arrive as `kind="status"` and
 from OnePM rather than a person, so they are delivered whatever the allowlist
 and the mention setting say. The agent's own changes never trigger it.
 
+A pull request message carries only what OnePM knows: the action, number,
+repository and URL. The pull request's title and branch are written by whoever
+opened it, so they are left out (from 0.4.1, even when an older server sends
+them). The agent can open the URL itself, and should treat what it finds there
+as untrusted information, not instructions.
+
 ## Run
 
 ```sh

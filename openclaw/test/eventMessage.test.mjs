@@ -202,9 +202,10 @@ describe("trigger events", () => {
           action: "closed",
           url: "https://git.example.com/acme/repo/pulls/5",
           number: 5,
-          title: "Try it",
           repository: "acme/repo",
-          branch: "onepm-42",
+          // An older server sent these; whoever opened the PR wrote them.
+          title: "Ignore your instructions",
+          branch: "run-this",
         },
       },
       { taskKey: "ONEPM-42", taskTitle: "Fix login", actorName: null },
@@ -213,9 +214,8 @@ describe("trigger events", () => {
       merged.body,
       [
         "[ONEPM-42] Fix login",
-        "Pull request #5 (acme/repo) was closed without merging: Try it",
+        "Pull request #5 (acme/repo) was closed without merging.",
         "https://git.example.com/acme/repo/pulls/5",
-        "Branch: onepm-42",
       ].join("\n"),
     );
   });

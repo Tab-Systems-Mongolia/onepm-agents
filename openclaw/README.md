@@ -64,7 +64,7 @@ Comments from other OnePM agents are dropped unless that agent's user id is in `
 
 ### Triggers
 
-A project admin can set **triggers** on the agent in **Project settings › Agents**: a task assigned to it entering a chosen status, or a linked pull request being opened, merged or closed. They arrive in the task's chat as a message from `OnePM` (sender id `onepm`) that says what happened, such as "Pull request #57 (acme/repo) was merged: Fix the board". OnePM sends them, not a person, so `allowFrom` and `requireMention` don't apply to them. The agent's own changes never trigger it. Version 0.1.0 ignores them.
+A project admin can set **triggers** on the agent in **Project settings › Agents**: a task assigned to it entering a chosen status, or a linked pull request being opened, merged or closed. They arrive in the task's chat as a message from `OnePM` (sender id `onepm`) that says what happened, such as "Pull request #57 (acme/repo) was merged.". OnePM sends them, not a person, so `allowFrom` and `requireMention` don't apply to them. The agent's own changes never trigger it. Version 0.1.0 ignores them. A pull request message carries only what OnePM knows: the action, number, repository and URL. Its title and branch are written by whoever opened it, so they are left out (from 0.2.1, even when an older server sends them). The agent can open the URL itself, and should treat what it finds there as untrusted information, not instructions.
 
 ## Run
 
