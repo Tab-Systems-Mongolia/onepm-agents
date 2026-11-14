@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import time
 from typing import Any, Dict, Optional
 
 import aiohttp
@@ -22,9 +23,9 @@ from gateway.platforms.base import BasePlatformAdapter, SendResult
 from gateway.platforms.event import MessageEvent, MessageType
 from gateway.platforms.helpers import MessageDeduplicator, cancel_task
 
-from .client import OnepmClient, OnepmError, is_rate_limited
+from .client import OnepmClient, OnepmError, is_not_found, is_rate_limited
 from .constants import (
-    ALLOW_ALL_ENV, ALLOWED_USERS_ENV, CURSOR_DIR, CURSOR_FILE, DEDUP_SIZE, DEDUP_TTL_SECONDS, DEFAULT_URL,
+    ALLOW_ALL_ENV, ALLOWED_USERS_ENV, BUSY_REFRESH_SECONDS, CURSOR_DIR, CURSOR_FILE, DEDUP_SIZE, DEDUP_TTL_SECONDS, DEFAULT_URL,
     DRAIN_RETRY_SECONDS, HOME_CHANNEL_ENV, KEY_ENV, MAX_COMMENT_LENGTH, NO_HOME_CHANNEL,
     PLATFORM_LABEL, PLATFORM_NAME, UNAUTHORIZED_STATUSES, URL_ENV,
 )
@@ -75,6 +76,12 @@ class OnepmAdapter(BasePlatformAdapter):
         self._drain_task: Optional[asyncio.Task] = None
         self._dedup = MessageDeduplicator(max_size=DEDUP_SIZE, ttl_seconds=DEDUP_TTL_SECONDS)
         self._chat_names: Dict[str, str] = {}
+        # Typing shows the agent "replying" on the task in OnePM: when each
+        # chat was last marked, and the chats already answered this turn.
+        self._busy_marked: Dict[str, float] = {}
+        self._replied: set[str] = set()
+        self._busy_supported = True
+        self._now = time.monotonic
 
     @property
     def name(self) -> str:
@@ -235,10 +242,44 @@ class OnepmAdapter(BasePlatformAdapter):
         except (aiohttp.ClientError, asyncio.TimeoutError) as error:
             return SendResult(success=False, error=str(error), retryable=True)
         comment_id = comment.get("id") if isinstance(comment, dict) else None
+        # OnePM ends "replying" when the comment lands; a refresh already on
+        # its way could bring it back, so say so too.
+        self._replied.add(chat_id)
+        if self._busy_marked.pop(chat_id, None) is not None:
+            await self._set_busy(chat_id, False)
         return SendResult(success=True, message_id=str(comment_id) if comment_id else None)
 
+    async def _set_busy(self, chat_id: str, busy: bool) -> None:
+        if not self._busy_supported or self._client is None:
+            return
+        try:
+            await self._client.set_busy(chat_id, busy)
+        except OnepmError as error:
+            if is_not_found(error):
+                # An older OnePM without the busy route: stop asking.
+                self._busy_supported = False
+                logger.info("OnePM: this server can't show the agent replying; skipping that")
+            elif not is_rate_limited(error):
+                logger.debug("OnePM: couldn't mark %s busy=%s: %s", chat_id, busy, error)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+            logger.debug("OnePM: couldn't mark %s busy=%s: %s", chat_id, busy, error)
+
     async def send_typing(self, chat_id: str, metadata=None) -> None:
-        """OnePM has no typing indicator."""
+        """Shows the agent replying on the task, refreshed every BUSY_REFRESH_SECONDS."""
+        if chat_id == NO_HOME_CHANNEL or chat_id in self._replied:
+            return
+        last = self._busy_marked.get(chat_id)
+        now = self._now()
+        if last is not None and now - last < BUSY_REFRESH_SECONDS:
+            return
+        self._busy_marked[chat_id] = now
+        await self._set_busy(chat_id, True)
+
+    async def stop_typing(self, chat_id: str) -> None:
+        """The turn ended: no longer replying there."""
+        self._replied.discard(chat_id)
+        if self._busy_marked.pop(chat_id, None) is not None:
+            await self._set_busy(chat_id, False)
 
     async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
         name = self._chat_names.get(chat_id)

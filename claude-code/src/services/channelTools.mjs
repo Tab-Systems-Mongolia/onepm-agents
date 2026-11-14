@@ -50,7 +50,7 @@ const requiredString = (args, name) => {
   return value.trim();
 };
 
-export const createChannelTools = ({ client, apiKey, getSelf }) => {
+export const createChannelTools = ({ client, apiKey, getSelf, busy }) => {
   const reply = async (args) => {
     const chatId = requiredString(args, "chat_id");
     const text = maskSecrets(requiredString(args, "text"), [apiKey]);
@@ -70,6 +70,7 @@ export const createChannelTools = ({ client, apiKey, getSelf }) => {
       }
       throw error;
     }
+    busy?.stop(chatId);
     return textResult(posted === 1 ? "posted" : `posted as ${posted} comments`);
   };
 

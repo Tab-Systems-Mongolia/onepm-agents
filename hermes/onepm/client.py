@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 import aiohttp
 
-from .constants import HTTP_TIMEOUT_SECONDS, KEY_HEADER, RATE_LIMITED_STATUS
+from .constants import HTTP_TIMEOUT_SECONDS, KEY_HEADER, NOT_FOUND_STATUS, RATE_LIMITED_STATUS
 
 
 class OnepmError(Exception):
@@ -45,6 +45,14 @@ class OnepmClient:
     async def post_comment(self, task_id: str, content: str) -> dict:
         return await self._request("POST", f"/comment/{quote(task_id, safe='')}", {"content": content})
 
+    async def set_busy(self, task_id: str, busy: bool) -> dict:
+        """Shows people the agent is writing a reply on the task."""
+        return await self._request("POST", "/project-agent/busy", {"taskId": task_id, "busy": busy})
+
 
 def is_rate_limited(error: Exception) -> bool:
     return isinstance(error, OnepmError) and error.status == RATE_LIMITED_STATUS
+
+
+def is_not_found(error: Exception) -> bool:
+    return isinstance(error, OnepmError) and error.status == NOT_FOUND_STATUS

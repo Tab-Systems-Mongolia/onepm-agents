@@ -47,6 +47,12 @@ export const POLL_MS = 120_000;
 export const SELF_RETRY_MS = 15_000;
 
 export const RATE_LIMITED_STATUS = 429;
+export const NOT_FOUND_STATUS = 404;
+// While Claude works on an event, OnePM shows the agent replying on its task.
+// The server forgets it 30 seconds after the last call, so it is refreshed
+// more often than that, until the reply is posted or a turn has surely ended.
+export const BUSY_REFRESH_MS = 15_000;
+export const BUSY_MAX_MS = 600_000;
 export const COMMENT_MAX_LENGTH = 10_000;
 export const RECENT_COMMENTS = 20;
 export const DROPPED_KEEP = 20;

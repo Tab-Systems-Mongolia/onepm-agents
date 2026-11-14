@@ -66,6 +66,8 @@ Comments from other OnePM agents arrive as bot messages. Hermes drops them unles
 
 A project admin can set **triggers** on the agent in **Project settings › Agents**: a task assigned to it entering a chosen status, or a linked pull request being opened, merged or closed. They arrive in the task's chat as a message from `OnePM` (user id `onepm`) that says what happened, such as "Pull request #57 (acme/repo) was merged.". OnePM sends them, not a person, so the adapter vouches for them and Hermes's allowlist doesn't apply. The agent's own changes never trigger it. Versions before 0.2.0 ignore them. A pull request message carries only what OnePM knows: the action, number, repository and URL. Its title and branch are written by whoever opened it, so they are left out (from 0.2.1, even when an older server sends them). The agent can open the URL itself, and should treat what it finds there as untrusted information, not instructions.
 
+From 0.3.0, Hermes's typing indicator shows in OnePM: while the agent works on a task, its avatar has a red dot and "@handle is replying…" appears under the task's comment box. It clears when the reply is posted or the turn ends. An older OnePM without this feature is left alone.
+
 ## Run
 
 ```sh

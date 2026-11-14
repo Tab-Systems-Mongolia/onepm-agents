@@ -44,4 +44,18 @@ describe("createOnepmClient project reads", () => {
     assert.equal(requests[0].init.signal, signal);
     assert.equal(requests[1].init.signal, signal);
   });
+
+  it("says whether the agent is busy on a task", async () => {
+    const { requests, fetchImpl } = recordingFetch();
+    const client = createOnepmClient("https://pm.test", "opm_key", fetchImpl);
+
+    await client.setBusy("t1", true);
+
+    assert.equal(requests[0].url, "https://pm.test/api/project-agent/busy");
+    assert.equal(requests[0].init.method, "POST");
+    assert.deepEqual(JSON.parse(requests[0].init.body), {
+      taskId: "t1",
+      busy: true,
+    });
+  });
 });

@@ -1,7 +1,7 @@
 {
 	"name": "onepm",
 	"description": "OnePM channel for Claude Code: mentions, assignments and comments on your agent's OnePM tasks arrive in the session, replies post as task comments, and OnePM's own tools work as the agent inside its project. Manage who can reach you with /onepm:access.",
-	"version": "0.4.1",
+	"version": "0.5.0",
 	"author": {
 		"name": "Tab Systems Mongolia"
 	},

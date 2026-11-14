@@ -1,4 +1,8 @@
-import { API_KEY_HEADER, RATE_LIMITED_STATUS } from "../constants/onepm.mjs";
+import {
+  API_KEY_HEADER,
+  NOT_FOUND_STATUS,
+  RATE_LIMITED_STATUS,
+} from "../constants/onepm.mjs";
 
 export class OnepmHttpError extends Error {
   constructor(method, path, status) {
@@ -38,8 +42,17 @@ export const createOnepmClient = (baseUrl, apiKey, fetchImpl = fetch) => {
         method: "POST",
         body: JSON.stringify({ content }),
       }),
+    // Shows people the agent is writing a reply on the task.
+    setBusy: (taskId, busy) =>
+      request("/project-agent/busy", {
+        method: "POST",
+        body: JSON.stringify({ taskId, busy }),
+      }),
   };
 };
 
 export const isRateLimited = (error) =>
   error instanceof OnepmHttpError && error.status === RATE_LIMITED_STATUS;
+
+export const isNotFound = (error) =>
+  error instanceof OnepmHttpError && error.status === NOT_FOUND_STATUS;

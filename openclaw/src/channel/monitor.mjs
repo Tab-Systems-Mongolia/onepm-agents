@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { POLL_MS, SELF_RETRY_MS, STATE_SUBDIR } from "../constants/onepm.mjs";
 import { connectAgentSocket } from "../services/agentSocket.mjs";
+import { createBusyMarker } from "../services/busyTyping.mjs";
 import { createCursorFile } from "../services/cursorFile.mjs";
 import { createEventFeed } from "../services/eventFeed.mjs";
 import { createOnepmClient } from "../services/onepmClient.mjs";
@@ -30,6 +31,7 @@ export const startOnepmMonitor = ({
 
   const reply = (taskId, text) =>
     postReply({ client, taskId, text, apiKey: account.apiKey });
+  const busy = createBusyMarker({ client, log });
 
   const start = async () => {
     if (stopped) return;
@@ -59,6 +61,7 @@ export const startOnepmMonitor = ({
           event,
           details,
           postReply: reply,
+          typing: busy.typingFor(event.taskId),
           log,
           statusSink,
         }),

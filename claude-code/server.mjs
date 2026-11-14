@@ -45,6 +45,7 @@ import {
   createChannelTools,
   createIdleTools,
 } from "./src/services/channelTools.mjs";
+import { createBusyTracker } from "./src/services/busyTracker.mjs";
 import { createEventFeed } from "./src/services/eventFeed.mjs";
 import { createOnepmClient } from "./src/services/onepmClient.mjs";
 import { loadProjectContext } from "./src/services/projectContext.mjs";
@@ -80,6 +81,8 @@ if (idleReason) log(idleReason);
 const client = idleReason
   ? null
   : createOnepmClient(config.baseUrl, config.apiKey);
+// Shows people in OnePM that the agent is writing a reply on a task.
+const busy = client ? createBusyTracker({ client, log }) : null;
 let self = null;
 // Set once Claude Code has finished the handshake; notifications sent
 // before then are lost.
@@ -145,6 +148,7 @@ const tools = createToolRouter({
         client,
         apiKey: config.apiKey,
         getSelf: () => self,
+        busy,
       }),
   remote,
 });
@@ -182,8 +186,13 @@ const start = async () => {
     state,
     owner: { url: config.baseUrl, agentId: self.id },
     self,
-    deliver: ({ content, meta }) =>
-      mcp.notification({ method: CHANNEL_METHOD, params: { content, meta } }),
+    deliver: async ({ content, meta }) => {
+      await mcp.notification({
+        method: CHANNEL_METHOD,
+        params: { content, meta },
+      });
+      busy.start(meta.chat_id);
+    },
     log,
   });
   try {
@@ -229,6 +238,7 @@ const shutdown = () => {
   if (retryTimer) clearTimeout(retryTimer);
   if (pollTimer) clearInterval(pollTimer);
   socket?.stop();
+  busy?.stopAll();
   void remote?.stop();
   setTimeout(() => process.exit(0), 500).unref();
 };

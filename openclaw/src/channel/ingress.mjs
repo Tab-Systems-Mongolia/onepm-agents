@@ -100,6 +100,7 @@ export const handleOnepmInbound = async ({
   event,
   details,
   postReply,
+  typing,
   log,
   statusSink,
 }) => {
@@ -189,7 +190,8 @@ export const handleOnepmInbound = async ({
         );
       },
     },
-    replyPipeline: {},
+    // OnePM shows the agent replying on the task while the turn runs.
+    replyPipeline: typing ? { typing } : {},
     replyOptions: {},
     record: {
       onRecordError: (error) => {

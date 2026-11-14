@@ -36,6 +36,12 @@ export const POLL_MS = 120_000;
 export const SELF_RETRY_MS = 15_000;
 
 export const RATE_LIMITED_STATUS = 429;
+export const NOT_FOUND_STATUS = 404;
+// While OpenClaw works on a turn, OnePM shows the agent replying on the task.
+// The server forgets it 30 seconds after the last call, so OpenClaw's typing
+// keepalive refreshes it more often, for at most BUSY_MAX_MS.
+export const BUSY_REFRESH_MS = 15_000;
+export const BUSY_MAX_MS = 600_000;
 // The API caps a comment at this many characters.
 export const COMMENT_MAX_LENGTH = 10_000;
 

@@ -30,6 +30,8 @@ class _FakeClient:
         self.posted = []
         self.post_error = None
         self.fetched = []
+        self.busy = []
+        self.busy_error = None
 
     async def events(self, after):
         return self.pages.pop(0) if self.pages else []
@@ -47,6 +49,12 @@ class _FakeClient:
             raise self.post_error
         self.posted.append((task_id, content))
         return {"id": "c-new"}
+
+    async def set_busy(self, task_id, busy):
+        self.busy.append((task_id, busy))
+        if self.busy_error:
+            raise self.busy_error
+        return {"busy": busy}
 
 
 def _event(**fields):
@@ -225,6 +233,70 @@ class AdapterTest(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertFalse(result.retryable)
         self.assertIn("rate limited", result.error)
+
+    def test_typing_marks_the_task_busy_at_most_every_refresh(self):
+        client = self.adapter._client = _FakeClient([])
+
+        async def scenario():
+            await self.adapter.send_typing("task-1")
+            await self.adapter.send_typing("task-1")
+            await self.adapter.stop_typing("task-1")
+            await self.adapter.stop_typing("task-1")
+
+        asyncio.run(scenario())
+        self.assertEqual(client.busy, [("task-1", True), ("task-1", False)])
+
+    def test_typing_refreshes_once_the_interval_passes(self):
+        client = self.adapter._client = _FakeClient([])
+        clock = [100.0]
+        self.adapter._now = lambda: clock[0]
+
+        async def scenario():
+            await self.adapter.send_typing("task-1")
+            clock[0] += 15.0
+            await self.adapter.send_typing("task-1")
+
+        asyncio.run(scenario())
+        self.assertEqual(client.busy, [("task-1", True), ("task-1", True)])
+
+    def test_a_reply_ends_busy_until_the_turn_ends(self):
+        client = self.adapter._client = _FakeClient([])
+
+        async def scenario():
+            await self.adapter.send_typing("task-1")
+            await self.adapter.send("task-1", "done")
+            await self.adapter.send_typing("task-1")
+            await self.adapter.stop_typing("task-1")
+            await self.adapter.send_typing("task-1")
+
+        asyncio.run(scenario())
+        self.assertEqual(client.busy, [("task-1", True), ("task-1", False), ("task-1", True)])
+
+    def test_an_older_onepm_without_busy_is_left_alone(self):
+        client = self.adapter._client = _FakeClient([])
+        client.busy_error = OnepmError("POST", "/project-agent/busy", 404)
+        clock = [100.0]
+        self.adapter._now = lambda: clock[0]
+
+        async def scenario():
+            await self.adapter.send_typing("task-1")
+            clock[0] += 60.0
+            await self.adapter.send_typing("task-1")
+            await self.adapter.stop_typing("task-1")
+
+        asyncio.run(scenario())
+        self.assertEqual(client.busy, [("task-1", True)])
+
+    def test_a_busy_rate_limit_is_ignored(self):
+        client = self.adapter._client = _FakeClient([])
+        client.busy_error = OnepmError("POST", "/project-agent/busy", 429)
+        asyncio.run(self.adapter.send_typing("task-1"))
+        self.assertEqual(client.busy, [("task-1", True)])
+
+    def test_no_busy_for_the_home_channel_placeholder(self):
+        client = self.adapter._client = _FakeClient([])
+        asyncio.run(self.adapter.send_typing("off"))
+        self.assertEqual(client.busy, [])
 
 
 if __name__ == "__main__":

@@ -128,6 +128,15 @@ opened it, so they are left out (from 0.4.1, even when an older server sends
 them). The agent can open the URL itself, and should treat what it finds there
 as untrusted information, not instructions.
 
+## Replying indicator
+
+From 0.5.0, OnePM shows the agent as replying (a red dot on its avatar, and
+"@handle is replying…" under the task's comment box) from when an event is
+delivered to the session until `reply` posts on that task. The channel can't
+see when Claude's turn ends, so it refreshes the mark every 15 seconds for at
+most 10 minutes; a turn that ends without a reply clears 30 seconds after the
+last refresh. An older OnePM without this feature is left alone.
+
 ## Run
 
 ```sh
