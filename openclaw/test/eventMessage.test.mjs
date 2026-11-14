@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 import {
   addressesAgent,
   formatEvent,
+  ingressPolicy,
   isRequest,
+  isTriggerEvent,
   mentionsAgent,
   readableText,
   splitReply,
@@ -139,5 +141,82 @@ describe("splitReply", () => {
 
   it("cuts where no break is close enough", () => {
     assert.deepEqual(splitReply("abcdefghij", 4), ["abcd", "efgh", "ij"]);
+  });
+});
+
+describe("trigger events", () => {
+  const trigger = {
+    id: "e5",
+    kind: "status",
+    actorId: null,
+    actorSource: "trigger",
+    taskId: "t1",
+    status: { from: "In Progress", to: "Test" },
+  };
+  const account = { allowFrom: ["user-1"], requireMention: true };
+
+  it("are requests with or without an actor, only when OnePM marks them", () => {
+    assert.equal(isTriggerEvent(trigger), true);
+    assert.equal(isRequest(trigger, self.id), true);
+    assert.equal(
+      isRequest({ ...trigger, kind: "pull_request", actorId: "u" }, self.id),
+      true,
+    );
+    assert.equal(isTriggerEvent({ ...trigger, actorSource: "browser" }), false);
+    assert.equal(
+      isRequest({ ...trigger, actorSource: "browser" }, self.id),
+      false,
+    );
+    assert.equal(addressesAgent(trigger, null, self), true);
+  });
+
+  it("come from OnePM and pass the allowlist and the mention gate", () => {
+    assert.deepEqual(ingressPolicy(account, trigger), {
+      senderId: "onepm",
+      allowFrom: ["*"],
+      requireMention: false,
+    });
+    assert.deepEqual(
+      ingressPolicy(account, { kind: "comment", actorId: "user-2" }),
+      { senderId: "user-2", allowFrom: ["user-1"], requireMention: true },
+    );
+  });
+
+  it("read as what happened to the task", () => {
+    const message = formatEvent(
+      { ...trigger, actorId: "user-1" },
+      { taskKey: "ONEPM-42", taskTitle: "Fix login", actorName: "Sura" },
+    );
+    assert.equal(
+      message.body,
+      "[ONEPM-42] Fix login\nSura moved it from In Progress to Test.",
+    );
+    assert.equal(message.senderId, "onepm");
+    assert.equal(message.senderName, "OnePM");
+    const merged = formatEvent(
+      {
+        ...trigger,
+        kind: "pull_request",
+        status: null,
+        pullRequest: {
+          action: "closed",
+          url: "https://git.example.com/acme/repo/pulls/5",
+          number: 5,
+          title: "Try it",
+          repository: "acme/repo",
+          branch: "onepm-42",
+        },
+      },
+      { taskKey: "ONEPM-42", taskTitle: "Fix login", actorName: null },
+    );
+    assert.equal(
+      merged.body,
+      [
+        "[ONEPM-42] Fix login",
+        "Pull request #5 (acme/repo) was closed without merging: Try it",
+        "https://git.example.com/acme/repo/pulls/5",
+        "Branch: onepm-42",
+      ].join("\n"),
+    );
   });
 });

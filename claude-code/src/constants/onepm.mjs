@@ -55,4 +55,17 @@ export const EVENT_KINDS = {
   mention: "mention",
   assignment: "assignment",
   comment: "comment",
+  status: "status",
+  pullRequest: "pull_request",
+};
+// Kinds OnePM sends when a trigger an admin set fires on a task assigned to
+// the agent. They come from OnePM, not a person, so no allowlist applies.
+export const TRIGGER_KINDS = [EVENT_KINDS.status, EVENT_KINDS.pullRequest];
+export const TRIGGER_SOURCE = "trigger";
+// Who a trigger message is from when no person caused it.
+export const TRIGGER_SENDER = "OnePM";
+export const PULL_REQUEST_ACTION_TEXT = {
+  opened: "was opened",
+  merged: "was merged",
+  closed: "was closed without merging",
 };

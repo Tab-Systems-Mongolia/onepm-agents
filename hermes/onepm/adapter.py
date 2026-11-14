@@ -30,8 +30,8 @@ from .constants import (
 )
 from .cursor import CursorStore, skip_history
 from .events import (
-    Inbound, chat_name, find_comment, is_agent_actor, is_request, needs_comment, needs_task, task_key,
-    to_inbound,
+    Inbound, chat_name, find_comment, is_agent_actor, is_request, is_trigger, needs_comment, needs_task,
+    task_key, to_inbound,
 )
 from .masking import mask_secrets
 from .socket_link import run_socket
@@ -186,9 +186,9 @@ class OnepmAdapter(BasePlatformAdapter):
         """Whether Hermes's allowlist would refuse the sender, asked before the task or comment is
         read so a refused user can't make the agent fetch anything. The check is the one the
         gateway registers (set_authorization_check); with no actor or no check, handle_message
-        decides as before."""
+        decides as before. A trigger has no sender to check: OnePM sent it."""
         actor_id = event.get("actorId")
-        if not actor_id:
+        if not actor_id or is_trigger(event):
             return False
         refused = self._is_sender_authorized(
             str(actor_id), "group", str(event["taskId"]), is_bot=is_agent_actor(event)) is False
@@ -212,7 +212,7 @@ class OnepmAdapter(BasePlatformAdapter):
         source = self.build_source(
             chat_id=inbound.chat_id, chat_name=inbound.chat_name, chat_type="group",
             user_id=inbound.user_id, user_name=inbound.user_name, is_bot=inbound.is_bot,
-            message_id=inbound.message_id)
+            message_id=inbound.message_id, role_authorized=inbound.trusted)
         await self.handle_message(MessageEvent(
             text=inbound.text, message_type=MessageType.TEXT, source=source,
             message_id=inbound.message_id, timestamp=inbound.timestamp))

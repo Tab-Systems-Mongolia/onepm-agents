@@ -3,7 +3,11 @@ import { defineStableChannelIngressIdentity } from "openclaw/plugin-sdk/channel-
 import { resolveAgentRoute } from "openclaw/plugin-sdk/routing";
 import { CHANNEL_ID, CHANNEL_LABEL } from "../constants/onepm.mjs";
 import { normalizeAllowEntry, taskTarget } from "../lib/account.mjs";
-import { addressesAgent, formatEvent } from "../lib/eventMessage.mjs";
+import {
+  addressesAgent,
+  formatEvent,
+  ingressPolicy,
+} from "../lib/eventMessage.mjs";
 import { getOnepmRuntime } from "./runtime.mjs";
 
 // The sender is the event's actorId: the OnePM server, reached with the
@@ -21,9 +25,10 @@ export const onepmIngressIdentity = defineStableChannelIngressIdentity({
 // Every task is a group chat (chat id = task id) and OnePM has no direct
 // messages, so only the group gates apply. There is no pairing: a code
 // posted on a task would be public. A sender outside allowFrom is dropped
-// without an answer.
-const resolveAccess = ({ core, cfg, account, event, wasMentioned, route }) =>
-  core.channel.inbound.ingress
+// without an answer. A trigger event is from OnePM itself and passes.
+const resolveAccess = ({ core, cfg, account, event, wasMentioned, route }) => {
+  const policy = ingressPolicy(account, event);
+  return core.channel.inbound.ingress
     .createResolver({
       channelId: CHANNEL_ID,
       accountId: account.accountId,
@@ -32,7 +37,7 @@ const resolveAccess = ({ core, cfg, account, event, wasMentioned, route }) =>
       readStoreAllowFrom: async () => [],
     })
     .message({
-      subject: { stableId: normalizeAllowEntry(event.actorId) },
+      subject: { stableId: normalizeAllowEntry(policy.senderId) },
       conversation: { kind: "group", id: event.taskId },
       ...(route
         ? {
@@ -55,14 +60,15 @@ const resolveAccess = ({ core, cfg, account, event, wasMentioned, route }) =>
       policy: {
         groupAllowFromFallbackToAllowFrom: true,
         activation: {
-          requireMention: account.requireMention,
+          requireMention: policy.requireMention,
           allowTextCommands: false,
         },
       },
-      allowFrom: account.allowFrom,
-      groupAllowFrom: account.allowFrom,
+      allowFrom: policy.allowFrom,
+      groupAllowFrom: policy.allowFrom,
       command: { allowTextCommands: false, hasControlCommand: false },
     });
+};
 
 const routeFor = (cfg, account, taskId) =>
   resolveAgentRoute({

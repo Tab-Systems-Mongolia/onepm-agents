@@ -15,8 +15,20 @@ SOCKET_PATH = "/api/ws/agent"
 
 # Event kinds that ask the agent something. finished/unassigned only free
 # worktrees, and the server leaves them out unless asked with include=release.
-REQUEST_KINDS = frozenset({"mention", "assignment", "comment"})
+REQUEST_KINDS = frozenset({"mention", "assignment", "comment", "status", "pull_request"})
 AGENT_ACTOR_SOURCE = "agent"
+# status and pull_request come from triggers a project admin set on tasks
+# assigned to the agent. OnePM sends them, not a person, so no allowlist
+# applies: they reach Hermes as from OnePM itself, vouched for by the adapter.
+TRIGGER_KINDS = frozenset({"status", "pull_request"})
+TRIGGER_ACTOR_SOURCE = "trigger"
+TRIGGER_SENDER_ID = "onepm"
+TRIGGER_SENDER_NAME = "OnePM"
+PULL_REQUEST_ACTION_TEXT = {
+    "opened": "was opened",
+    "merged": "was merged",
+    "closed": "was closed without merging",
+}
 
 # Socket messages from the server.
 AGENT_EVENT_MESSAGE = "AGENT_EVENT"

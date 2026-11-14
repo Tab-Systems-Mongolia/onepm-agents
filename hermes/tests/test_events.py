@@ -1,6 +1,8 @@
 import unittest
 
-from onepm.events import find_comment, is_request, needs_comment, needs_task, readable_text, to_inbound
+from onepm.events import (
+    find_comment, is_request, is_trigger, needs_comment, needs_task, readable_text, to_inbound,
+)
 
 AGENT = "agent-1"
 
@@ -70,6 +72,46 @@ class ToInboundTest(unittest.TestCase):
     def test_without_a_title_the_chat_is_named_by_its_id(self):
         inbound = to_inbound(_event(text="hi"), None, None, None)
         self.assertEqual(inbound.chat_name, "task-1")
+
+
+TRIGGER = {"sequence": 4, "id": "ev-9", "taskId": "task-1", "commentId": None, "actorSource": "trigger",
+           "taskKey": "ONEPM-42", "taskTitle": "Fix login", "createdAt": "2026-11-14T10:00:00.000Z"}
+PULL_REQUEST = {"action": "merged", "url": "https://github.com/acme/repo/pull/57", "number": 57,
+                "title": "Fix the board", "repository": "acme/repo", "branch": "onepm-42"}
+
+
+class TriggerTest(unittest.TestCase):
+    def test_trigger_kinds_are_requests(self):
+        self.assertTrue(is_request({**TRIGGER, "kind": "status", "actorId": "user-1"}, AGENT))
+        self.assertTrue(is_request({**TRIGGER, "kind": "pull_request", "actorId": None}, AGENT))
+        self.assertTrue(is_trigger({**TRIGGER, "kind": "status"}))
+        self.assertFalse(is_trigger({**TRIGGER, "kind": "status", "actorSource": "browser"}))
+        self.assertFalse(is_trigger(_event()))
+
+    def test_a_status_trigger_says_who_moved_the_task_where(self):
+        event = {**TRIGGER, "kind": "status", "actorId": "user-1", "actorName": "Saraa",
+                 "status": {"from": "In Progress", "to": "Test"}}
+        self.assertFalse(needs_task(event))
+        inbound = to_inbound(event, None, None, None)
+        self.assertEqual(inbound.text, "Saraa moved this task from In Progress to Test.")
+        self.assertEqual((inbound.user_id, inbound.user_name), ("onepm", "OnePM"))
+        self.assertTrue(inbound.trusted)
+        self.assertFalse(inbound.is_bot)
+        self.assertEqual(inbound.message_id, "ev-9")
+        self.assertEqual(inbound.chat_name, "ONEPM-42 Fix login")
+
+    def test_a_status_trigger_without_a_person(self):
+        event = {**TRIGGER, "kind": "status", "actorId": None, "status": {"from": None, "to": "Test"}}
+        self.assertEqual(to_inbound(event, None, None, None).text, "This task moved to Test.")
+
+    def test_a_pull_request_trigger(self):
+        event = {**TRIGGER, "kind": "pull_request", "actorId": None, "pullRequest": PULL_REQUEST}
+        self.assertEqual(to_inbound(event, None, None, None).text,
+                         "Pull request #57 (acme/repo) was merged: Fix the board\n"
+                         "https://github.com/acme/repo/pull/57\nBranch: onepm-42")
+
+    def test_other_events_are_not_trusted(self):
+        self.assertFalse(to_inbound(_event(), TASK, COMMENT, "onepm").trusted)
 
 
 class ReadableTextTest(unittest.TestCase):

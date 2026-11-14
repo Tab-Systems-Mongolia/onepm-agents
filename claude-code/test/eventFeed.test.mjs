@@ -124,6 +124,39 @@ describe("createEventFeed", () => {
     assert.equal(delivered.length, 0);
   });
 
+  it("delivers trigger events with an empty allowlist and skips unknown kinds", async () => {
+    const { delivered, state } = await run({
+      access: { allowFrom: [], requireMention: true },
+      events: [
+        event(1, {
+          kind: "pull_request",
+          commentId: null,
+          actorId: null,
+          actorSource: "trigger",
+          taskKey: "ONEPM-7",
+          taskTitle: "Fix login",
+          pullRequest: {
+            action: "merged",
+            url: "https://github.com/acme/repo/pull/5",
+            number: 5,
+            title: null,
+            repository: "acme/repo",
+            branch: null,
+          },
+        }),
+        event(2, { kind: "review_requested", actorSource: "trigger" }),
+      ],
+    });
+    assert.deepEqual(
+      delivered.map(({ content }) => content),
+      [
+        "[ONEPM-7] Fix login\nPull request #5 (acme/repo) was merged.\nhttps://github.com/acme/repo/pull/5",
+      ],
+    );
+    assert.equal(delivered[0].meta.user, "OnePM");
+    assert.equal(state.cursor, 2);
+  });
+
   it("reads the task and comment when an older server leaves them out", async () => {
     const { delivered } = await run({
       access: allowed,

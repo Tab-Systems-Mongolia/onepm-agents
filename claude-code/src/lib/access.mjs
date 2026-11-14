@@ -1,4 +1,8 @@
-import { EVENT_KINDS } from "../constants/onepm.mjs";
+import {
+  EVENT_KINDS,
+  TRIGGER_KINDS,
+  TRIGGER_SOURCE,
+} from "../constants/onepm.mjs";
 
 const DEFAULT_ACCESS = { allowFrom: [], requireMention: true };
 
@@ -19,12 +23,18 @@ export const normalizeAccess = (raw) => {
 export const isDeliverableKind = (kind) =>
   Object.values(EVENT_KINDS).includes(kind);
 
+// A status or pull request event OnePM sent for a trigger an admin set on a
+// task assigned to the agent.
+export const isTriggerEvent = (event) =>
+  event.actorSource === TRIGGER_SOURCE && TRIGGER_KINDS.includes(event.kind);
+
 // Whether the sender may reach the session at all. Checked before anything
-// is fetched for the event.
+// is fetched for the event. Trigger events have no sender to check.
 export const isAllowedSender = (event, access, selfId) =>
-  Boolean(event.actorId) &&
-  event.actorId !== selfId &&
-  access.allowFrom.includes(event.actorId);
+  isTriggerEvent(event) ||
+  (Boolean(event.actorId) &&
+    event.actorId !== selfId &&
+    access.allowFrom.includes(event.actorId));
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -40,7 +50,7 @@ export const mentionsAgent = (text, self) => {
 // requireMention: only mentions, assignments and comments that mention the
 // agent. Otherwise every comment on its tasks.
 export const passesMentionRule = (event, access, text, self) => {
-  if (!access.requireMention) return true;
+  if (!access.requireMention || isTriggerEvent(event)) return true;
   if (event.kind === EVENT_KINDS.comment) return mentionsAgent(text, self);
   return (
     event.kind === EVENT_KINDS.mention || event.kind === EVENT_KINDS.assignment

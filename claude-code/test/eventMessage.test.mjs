@@ -143,3 +143,78 @@ describe("splitReply", () => {
     );
   });
 });
+
+describe("formatEvent for triggers", () => {
+  const trigger = {
+    ...event,
+    commentId: null,
+    actorSource: "trigger",
+    taskKey: "ONEPM-42",
+  };
+
+  it("says which status the task moved to and who moved it", () => {
+    const { content, meta } = formatEvent(
+      {
+        ...trigger,
+        kind: "status",
+        status: { from: "In Progress", to: "Test" },
+      },
+      {
+        taskKey: "ONEPM-42",
+        taskTitle: "Fix login",
+        actorName: "Mira",
+        text: null,
+      },
+    );
+    assert.equal(
+      content,
+      "[ONEPM-42] Fix login\nMira moved it from In Progress to Test.",
+    );
+    assert.equal(meta.kind, "status");
+    assert.equal(meta.user, "Mira");
+  });
+
+  it("names OnePM when no one is behind the move", () => {
+    const { content, meta } = formatEvent(
+      {
+        ...trigger,
+        kind: "status",
+        actorId: null,
+        status: { from: null, to: "Test" },
+      },
+      { taskKey: "ONEPM-42", taskTitle: "Fix login", actorName: null },
+    );
+    assert.equal(content, "[ONEPM-42] Fix login\nIt moved to Test.");
+    assert.equal(meta.user, "OnePM");
+    assert.equal("user_id" in meta, false);
+  });
+
+  it("describes a linked pull request event", () => {
+    const { content, meta } = formatEvent(
+      {
+        ...trigger,
+        kind: "pull_request",
+        actorId: null,
+        pullRequest: {
+          action: "merged",
+          url: "https://github.com/acme/repo/pull/57",
+          number: 57,
+          title: "Fix the board",
+          repository: "acme/repo",
+          branch: "onepm-42",
+        },
+      },
+      { taskKey: "ONEPM-42", taskTitle: "Fix login", actorName: null },
+    );
+    assert.equal(
+      content,
+      [
+        "[ONEPM-42] Fix login",
+        "Pull request #57 (acme/repo) was merged: Fix the board",
+        "https://github.com/acme/repo/pull/57",
+        "Branch: onepm-42",
+      ].join("\n"),
+    );
+    assert.equal(meta.kind, "pull_request");
+  });
+});

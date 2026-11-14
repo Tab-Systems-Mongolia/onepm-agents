@@ -1,4 +1,8 @@
-import { EVENT_KINDS } from "../constants/onepm.mjs";
+import {
+  EVENT_KINDS,
+  PULL_REQUEST_ACTION_TEXT,
+  TRIGGER_SENDER,
+} from "../constants/onepm.mjs";
 
 const MENTION_TAG = /<kaneo-mention\b([^>]*)>([\s\S]*?)<\/kaneo-mention>/gi;
 const LABEL_ATTRIBUTE = /\blabel="([^"]*)"/i;
@@ -41,19 +45,53 @@ const ACTION_BY_KIND = {
   [EVENT_KINDS.comment]: "commented",
 };
 
+const statusLines = (event, actorName) => {
+  const { from, to } = event.status ?? {};
+  const target = to ?? "another status";
+  const route = from ? `from ${from} to ${target}` : `to ${target}`;
+  return [actorName ? `${actorName} moved it ${route}.` : `It moved ${route}.`];
+};
+
+const pullRequestLines = ({ pullRequest }) => {
+  if (!pullRequest) return ["A linked pull request changed."];
+  const where = pullRequest.repository ? ` (${pullRequest.repository})` : "";
+  const what =
+    PULL_REQUEST_ACTION_TEXT[pullRequest.action] ?? pullRequest.action;
+  return [
+    `Pull request #${pullRequest.number}${where} ${what}${pullRequest.title ? `: ${pullRequest.title}` : "."}`,
+    pullRequest.url,
+    ...(pullRequest.branch ? [`Branch: ${pullRequest.branch}`] : []),
+  ].filter(Boolean);
+};
+
+const linesOf = (event, details, who) => {
+  if (event.kind === EVENT_KINDS.status) {
+    return statusLines(event, details.actorName);
+  }
+  if (event.kind === EVENT_KINDS.pullRequest) return pullRequestLines(event);
+  const text = readableText(details.text);
+  return [
+    `${who} ${ACTION_BY_KIND[event.kind] ?? event.kind}${text ? ":" : "."}`,
+    ...(text ? ["", text] : []),
+  ];
+};
+
+const senderOf = (event, details) =>
+  details.actorName ||
+  event.actorId ||
+  (event.kind === EVENT_KINDS.status || event.kind === EVENT_KINDS.pullRequest
+    ? TRIGGER_SENDER
+    : "Someone");
+
 // details: { taskKey, taskTitle, actorName, text } as far as they're known.
+// Status and pull request events also carry `status` or `pullRequest`.
 export const formatEvent = (event, details) => {
-  const who = details.actorName || event.actorId || "Someone";
+  const who = senderOf(event, details);
   const task =
     [details.taskKey && `[${details.taskKey}]`, details.taskTitle]
       .filter(Boolean)
       .join(" ") || `Task ${event.taskId}`;
-  const text = readableText(details.text);
-  const content = [
-    task,
-    `${who} ${ACTION_BY_KIND[event.kind] ?? event.kind}${text ? ":" : "."}`,
-    ...(text ? ["", text] : []),
-  ].join("\n");
+  const content = [task, ...linesOf(event, details, who)].join("\n");
   const meta = {
     chat_id: event.taskId,
     user: who,

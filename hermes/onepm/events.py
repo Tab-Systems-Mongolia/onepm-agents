@@ -19,7 +19,12 @@ from .constants import (
     LABEL_ATTRIBUTE_PATTERN,
     LINE_BREAK_TAG_PATTERN,
     MENTION_TAG_PATTERN,
+    PULL_REQUEST_ACTION_TEXT,
     REQUEST_KINDS,
+    TRIGGER_ACTOR_SOURCE,
+    TRIGGER_KINDS,
+    TRIGGER_SENDER_ID,
+    TRIGGER_SENDER_NAME,
     UNNAMED_MENTION,
 )
 
@@ -41,6 +46,8 @@ class Inbound:
     message_id: str
     is_bot: bool
     timestamp: datetime.datetime
+    # A trigger event: OnePM, not a person, sent it, so the adapter vouches for it.
+    trusted: bool = False
 
 
 def _mention(match: re.Match) -> str:
@@ -63,6 +70,34 @@ def readable_text(content: Optional[str]) -> str:
 def is_request(event: dict, agent_id: str) -> bool:
     """Whether the event asks the agent something; its own comments never do."""
     return event.get("kind") in REQUEST_KINDS and event.get("actorId") != agent_id
+
+
+def is_trigger(event: dict) -> bool:
+    """A status or pull request event OnePM sent for a trigger an admin set."""
+    return event.get("actorSource") == TRIGGER_ACTOR_SOURCE and event.get("kind") in TRIGGER_KINDS
+
+
+def _status_text(event: dict) -> str:
+    status = event.get("status") or {}
+    target = status.get("to") or "another status"
+    route = f"from {status['from']} to {target}" if status.get("from") else f"to {target}"
+    actor = event.get("actorName")
+    return f"{actor} moved this task {route}." if actor else f"This task moved {route}."
+
+
+def _pull_request_text(event: dict) -> str:
+    pull = event.get("pullRequest") or {}
+    if not pull.get("number"):
+        return "A pull request linked to this task changed."
+    where = f" ({pull['repository']})" if pull.get("repository") else ""
+    what = PULL_REQUEST_ACTION_TEXT.get(pull.get("action"), pull.get("action") or "changed")
+    lines = [f"Pull request #{pull['number']}{where} {what}" + (f": {pull['title']}" if pull.get("title") else ".")]
+    lines += [line for line in (pull.get("url"), pull.get("branch") and f"Branch: {pull['branch']}") if line]
+    return "\n".join(lines)
+
+
+def trigger_text(event: dict) -> str:
+    return _status_text(event) if event.get("kind") == "status" else _pull_request_text(event)
 
 
 def is_agent_actor(event: dict) -> bool:
@@ -125,6 +160,8 @@ def event_text(event: dict, task: Optional[dict], comment: Optional[dict]) -> Op
 
 def to_inbound(event: dict, task: Optional[dict], comment: Optional[dict],
                project_slug: Optional[str]) -> Optional[Inbound]:
+    if is_trigger(event):
+        return _trigger_inbound(event, task, project_slug)
     text = event_text(event, task, comment)
     if text is None:
         return None
@@ -142,4 +179,21 @@ def to_inbound(event: dict, task: Optional[dict], comment: Optional[dict],
         message_id=str(event.get("commentId") or event["id"]),
         is_bot=is_agent_actor(event),
         timestamp=_parse_time(event.get("createdAt")),
+    )
+
+
+def _trigger_inbound(event: dict, task: Optional[dict], project_slug: Optional[str]) -> Inbound:
+    task_id = str(event["taskId"])
+    key = event.get("taskKey") or task_key(task, project_slug)
+    title = event.get("taskTitle") or (task or {}).get("title")
+    return Inbound(
+        chat_id=task_id,
+        chat_name=chat_name(key, title, task_id),
+        user_id=TRIGGER_SENDER_ID,
+        user_name=TRIGGER_SENDER_NAME,
+        text=trigger_text(event),
+        message_id=str(event["id"]),
+        is_bot=False,
+        timestamp=_parse_time(event.get("createdAt")),
+        trusted=True,
     )

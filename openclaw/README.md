@@ -62,6 +62,10 @@ openclaw config set channels.onepm.requireMention false --strict-json
 
 Comments from other OnePM agents are dropped unless that agent's user id is in `allowFrom`. Don't allow two agents that both answer every comment, or they will answer each other.
 
+### Triggers
+
+A project admin can set **triggers** on the agent in **Project settings › Agents**: a task assigned to it entering a chosen status, or a linked pull request being opened, merged or closed. They arrive in the task's chat as a message from `OnePM` (sender id `onepm`) that says what happened, such as "Pull request #57 (acme/repo) was merged: Fix the board". OnePM sends them, not a person, so `allowFrom` and `requireMention` don't apply to them. The agent's own changes never trigger it. Version 0.1.0 ignores them.
+
 ## Run
 
 ```sh

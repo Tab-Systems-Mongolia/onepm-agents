@@ -45,4 +45,19 @@ export const EVENT_KINDS = {
   mention: "mention",
   assignment: "assignment",
   comment: "comment",
+  status: "status",
+  pullRequest: "pull_request",
+};
+// Kinds OnePM sends when a trigger an admin set fires on a task assigned to
+// the agent. They come from OnePM, not a person: OpenClaw sees them as from
+// OnePM itself, past the allowlist and the mention gate.
+export const TRIGGER_KINDS = [EVENT_KINDS.status, EVENT_KINDS.pullRequest];
+export const TRIGGER_SOURCE = "trigger";
+export const TRIGGER_SENDER_ID = "onepm";
+export const TRIGGER_SENDER_NAME = "OnePM";
+export const ALLOW_EVERYONE = "*";
+export const PULL_REQUEST_ACTION_TEXT = {
+  opened: "was opened",
+  merged: "was merged",
+  closed: "was closed without merging",
 };

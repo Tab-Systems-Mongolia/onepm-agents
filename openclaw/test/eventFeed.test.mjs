@@ -117,6 +117,30 @@ describe("drain", () => {
     assert.equal(client.calls.task, 0);
   });
 
+  it("hands on a trigger without an actor and skips kinds it doesn't know", async () => {
+    const client = fakeClient(
+      [
+        event(1, {
+          kind: "pull_request",
+          actorId: null,
+          actorSource: "trigger",
+          commentId: null,
+          text: null,
+        }),
+        event(2, { kind: "review_requested", actorSource: "trigger" }),
+      ],
+      { pageSize: 10 },
+    );
+    const cursor = memoryCursor(0);
+    const { feed, handled } = feedWith(client, cursor);
+    await feed.drain();
+    assert.deepEqual(
+      handled.map(({ item }) => item.kind),
+      ["pull_request"],
+    );
+    assert.equal(cursor.read(), 2);
+  });
+
   it("drops a refused sender before reading the task", async () => {
     const client = fakeClient([event(1, { taskTitle: null })]);
     const cursor = memoryCursor(0);

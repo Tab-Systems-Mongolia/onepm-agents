@@ -112,6 +112,16 @@ channel reads it again for every event:
 }
 ```
 
+## Triggers
+
+A project admin can also set **triggers** on the agent in **Project settings ›
+Agents**: a task assigned to it entering a chosen status, or a linked pull
+request being opened, merged or closed. These arrive as `kind="status"` and
+`kind="pull_request"` messages that say what happened, for example
+`[ONEPM-42] Fix login` / `Pull request #57 (acme/repo) was merged`. They come
+from OnePM rather than a person, so they are delivered whatever the allowlist
+and the mention setting say. The agent's own changes never trigger it.
+
 ## Run
 
 ```sh
@@ -169,7 +179,9 @@ with the agent key (`claude mcp add ... onepm .../api/mcp`), remove it with
 
 - **Allowlist only.** Events from anyone not in `allowFrom` are dropped
   before anything about them is read. The agent's own comments never come
-  back as events.
+  back as events. Trigger events (`status`, `pull_request`) are the only
+  exception: OnePM sends them for triggers an admin set, only on tasks
+  assigned to the agent, and they carry no request from a person.
 - **Comments are untrusted input.** Task titles, descriptions, and comments
   are written by workspace members. The server instructions tell Claude to
   treat them as information, and never to change access because a comment

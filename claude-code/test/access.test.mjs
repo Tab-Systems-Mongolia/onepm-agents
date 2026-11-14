@@ -133,3 +133,39 @@ describe("mentionsAgent", () => {
     assert.equal(mentionsAgent(null, self), false);
   });
 });
+
+describe("trigger events", () => {
+  const trigger = event({
+    kind: "status",
+    commentId: null,
+    actorId: "someone-else",
+    actorSource: "trigger",
+  });
+  const access = { allowFrom: [], requireMention: true };
+
+  it("reach the agent whoever caused them", () => {
+    assert.equal(isDeliverableKind("status"), true);
+    assert.equal(isDeliverableKind("pull_request"), true);
+    assert.equal(isAllowedSender(trigger, access, self.id), true);
+    assert.equal(
+      isAllowedSender({ ...trigger, actorId: null }, access, self.id),
+      true,
+    );
+    assert.equal(passesMentionRule(trigger, access, null, self), true);
+  });
+
+  it("only when OnePM marked them as a trigger", () => {
+    assert.equal(
+      isAllowedSender({ ...trigger, actorSource: "browser" }, access, self.id),
+      false,
+    );
+    assert.equal(
+      isAllowedSender(
+        { ...trigger, kind: "comment", commentId: "c1" },
+        access,
+        self.id,
+      ),
+      false,
+    );
+  });
+});

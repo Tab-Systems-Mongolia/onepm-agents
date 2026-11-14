@@ -166,6 +166,39 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(client.fetched, [("task", "task-1"), ("comments", "task-1")])
         self.assertEqual(len(self.received), 1)
 
+    def test_a_trigger_is_delivered_past_the_allowlist_as_onepm(self):
+        checks = []
+
+        def allowlist(user_id, chat_type=None, chat_id=None, **extra):
+            checks.append(user_id)
+            return False
+
+        self.adapter.set_authorization_check(allowlist)
+        trigger = _event(kind="status", commentId=None, actorId="user-9", actorSource="trigger",
+                         taskKey="ONEPM-12", taskTitle="Fix login",
+                         status={"from": "In Progress", "to": "Test"})
+        client = self.adapter._client = _FakeClient([trigger])
+        asyncio.run(self.adapter._drain_once())
+        self.assertEqual(checks, [])
+        self.assertEqual(client.fetched, [])
+        (event,) = self.received
+        self.assertEqual(event.text, "This task moved from In Progress to Test.")
+        self.assertEqual((event.source.user_id, event.source.user_name), ("onepm", "OnePM"))
+        self.assertTrue(event.source.role_authorized)
+        self.assertEqual(self.adapter._cursor.read(), 1)
+
+    def test_a_person_is_never_vouched_for(self):
+        comment = {"id": "c-1", "content": "@bot look?", "userId": "user-1", "user": {"name": "Saraa"}}
+        self.adapter._client = _FakeClient([_event()], [comment])
+        asyncio.run(self.adapter._drain_once())
+        self.assertFalse(self.received[0].source.role_authorized)
+
+    def test_an_unknown_kind_is_skipped(self):
+        self.adapter._client = _FakeClient([_event(kind="review_requested", actorSource="trigger")])
+        asyncio.run(self.adapter._drain_once())
+        self.assertEqual(self.received, [])
+        self.assertEqual(self.adapter._cursor.read(), 1)
+
     def test_an_unreadable_task_is_skipped(self):
         client = _FakeClient([_event(kind="assignment", commentId=None)])
 
