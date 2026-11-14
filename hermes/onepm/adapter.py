@@ -190,8 +190,13 @@ class OnepmAdapter(BasePlatformAdapter):
         actor_id = event.get("actorId")
         if not actor_id:
             return False
-        return self._is_sender_authorized(
+        refused = self._is_sender_authorized(
             str(actor_id), "group", str(event["taskId"]), is_bot=is_agent_actor(event)) is False
+        if refused:
+            # handle_message logs this for other platforms; the refusal here comes first, so say
+            # it here: it's how the owner finds an id to add to ONEPM_ALLOWED_USERS.
+            logger.warning("Unauthorized user: %s (%s) on onepm", actor_id, event.get("actorName") or "?")
+        return refused
 
     async def _inbound_for(self, event: dict) -> Optional[Inbound]:
         task_id = str(event["taskId"])

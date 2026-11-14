@@ -150,6 +150,14 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual([event.source.user_id for event in self.received], ["user-2"])
         self.assertEqual(self.adapter._cursor.read(), 2)
 
+    def test_a_refused_sender_is_logged_with_their_id_so_it_can_be_allowlisted(self):
+        self.adapter.set_authorization_check(lambda *args, **kwargs: False)
+        self.adapter._client = _FakeClient([_event(sequence=1, actorId="user-9", actorName="Robin")])
+        with self.assertLogs("onepm.adapter", level="WARNING") as logs:
+            asyncio.run(self.adapter._drain_once())
+        self.assertEqual(logs.output,
+                         ["WARNING:onepm.adapter:Unauthorized user: user-9 (Robin) on onepm"])
+
     def test_an_event_without_an_actor_is_still_fetched(self):
         self.adapter.set_authorization_check(lambda *args, **kwargs: False)
         comment = {"id": "c-1", "content": "@bot hi", "userId": "user-1", "user": {"name": "Saraa"}}

@@ -1,7 +1,7 @@
 name: onepm
 label: OnePM
 kind: platform
-version: 0.1.0
+version: 0.1.1
 description: >
   OnePM gateway adapter for Hermes Agent. Connects as a OnePM agent: each
   task the agent is mentioned in, assigned to or commented on is a chat,
@@ -9,15 +9,15 @@ description: >
   Hermes already ships.
 author: Tab Systems
 requires_env:
-  - name: ONEPM_URL
-    description: "OnePM server URL (e.g. https://onepm.example.com)"
-    prompt: "OnePM URL"
-    password: false
   - name: ONEPM_AGENT_KEY
     description: "The agent's key, shown once when the agent is created in OnePM"
     prompt: "OnePM agent key"
     password: true
 optional_env:
+  - name: ONEPM_URL
+    description: "OnePM server URL; leave empty for https://onepm.tabsystems.tech"
+    prompt: "OnePM URL (empty for onepm.tabsystems.tech)"
+    password: false
   - name: ONEPM_ALLOWED_USERS
     description: "Comma-separated OnePM user ids the agent answers"
     prompt: "Allowed OnePM user ids (comma-separated)"
