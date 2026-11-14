@@ -19,15 +19,18 @@ You need:
 
 ## Set up on a Linux server
 
-Each agent runs as its own Hermes [profile](https://github.com/NousResearch/hermes-agent), named after the agent's OnePM handle, next to your other gateways. The examples use the handle `devbot`; use your agent's. Run every step as the `hermes` user.
+Each agent runs as its own Hermes [profile](https://github.com/NousResearch/hermes-agent), named after the agent's OnePM handle, next to your other gateways. The examples use the handle `devbot`; use your agent's. Run every step as the `hermes` user. Every step can be run again: none of them adds a second copy of a setting.
 
 ### 1. Create a profile named after the agent
 
 ```sh
 hermes profile create devbot --clone --no-alias
+cut -d= -f1 ~/.hermes/profiles/devbot/.env | grep -v '^#' | grep .
 ```
 
-`--clone` copies the current profile's `config.yaml`, `.env` and `SOUL.md`, so the model settings carry over. Hermes leaves the other profile's messaging channels (bot tokens, allowlists) behind. `--no-alias` skips the `devbot` wrapper command; every step here uses `hermes --profile devbot`. The profile lives in `~/.hermes/profiles/devbot/`.
+`--clone` copies the default profile's `config.yaml`, `.env` and `SOUL.md`, so the model settings carry over. So does everything else in them: API tokens (such as `GITHUB_TOKEN`), MCP servers and the sandbox's mounts. The second line lists the names, not the values, of what the `.env` now holds. Remove whatever this agent shouldn't have from `~/.hermes/profiles/devbot/.env` and `config.yaml`. To start empty instead, leave out `--clone` and set the model with `hermes --profile devbot model`.
+
+`--no-alias` skips the `devbot` wrapper command; every step here uses `hermes --profile devbot`. The profile lives in `~/.hermes/profiles/devbot/`.
 
 ### 2. Install the plugin into it
 
@@ -35,27 +38,28 @@ hermes profile create devbot --clone --no-alias
 hermes --profile devbot plugins install Tab-Systems-Mongolia/onepm-agents/hermes/onepm --enable
 ```
 
-`--profile` goes before the subcommand. Or copy the plugin folder from a clone of [Tab-Systems-Mongolia/onepm-agents](https://github.com/Tab-Systems-Mongolia/onepm-agents) to `~/.hermes/profiles/devbot/plugins/onepm` and run `hermes --profile devbot plugins enable onepm`.
+The install asks for the agent key: paste it. It isn't echoed, and it never appears in a command line, so it stays out of your shell history and `ps`. Hermes saves it in the profile's `.env`. Press Enter through the optional settings it asks next; step 3 sets them.
 
-### 3. Save the key without showing it
+`--profile` goes before the subcommand. Or copy the plugin folder from a clone of [Tab-Systems-Mongolia/onepm-agents](https://github.com/Tab-Systems-Mongolia/onepm-agents) to `~/.hermes/profiles/devbot/plugins/onepm`, run `hermes --profile devbot plugins enable onepm`, and add `ONEPM_AGENT_KEY=<key>` to the `.env` yourself.
 
-```sh
-(umask 077; trap 'stty echo' EXIT; printf 'OnePM agent key: '; stty -echo; IFS= read -r K; stty echo; echo; printf 'ONEPM_AGENT_KEY=%s\n' "$K" >> ~/.hermes/profiles/devbot/.env)
-chmod 600 ~/.hermes/profiles/devbot/.env
-```
-
-Paste the key at the prompt. It isn't echoed, and it never appears in a command line, so it stays out of your shell history and `ps`. To change it later, edit that line in the file.
-
-### 4. Allow yourself, and keep tasks out of the home channel
+### 3. Settings
 
 ```sh
-cat >> ~/.hermes/profiles/devbot/.env <<EOF
-ONEPM_ALLOWED_USERS=<your OnePM user id>
-ONEPM_HOME_CHANNEL=off
-EOF
+f=~/.hermes/profiles/devbot/.env
+for kv in \
+  "ONEPM_ALLOWED_USERS=<your OnePM user id>" \
+  "ONEPM_HOME_CHANNEL=off" \
+  "ONEPM_WORKSPACE=$HOME/.hermes/profiles/devbot/onepm/repos" \
+  "ONEPM_WORKSPACE_IN_SANDBOX=/workspace/repos" \
+  "ONEPM_SSH_DIR=$HOME/.ssh/onepm-agent" \
+; do
+  (umask 077; grep -v "^${kv%%=*}=" "$f" > "$f.new"; echo "$kv" >> "$f.new"; mv "$f.new" "$f")
+done
 ```
 
-Without `ONEPM_URL` the plugin connects to the hosted OnePM, `https://onepm.tabsystems.tech`. For a self-hosted instance, add `ONEPM_URL=https://onepm.example.com` too.
+Each line replaces an earlier line with the same name, including one the install wrote. `$HOME` expands as you run it, so the file gets absolute paths. The **Connect** dialog fills in your user id.
+
+Without `ONEPM_URL` the plugin connects to the hosted OnePM, `https://onepm.tabsystems.tech`. For a self-hosted instance, add `"ONEPM_URL=https://onepm.example.com"` to the list.
 
 Hermes answers only the users in `ONEPM_ALLOWED_USERS` (comma-separated), and it posts nothing on the task for anyone else: a task is a shared chat, so the plugin never shows a pairing code there. To find someone's user id, ask them to mention the agent while the gateway runs. Hermes ignores the message and logs `Unauthorized user: <user id> (<name>) on onepm`. Add that id and restart the gateway.
 
@@ -63,37 +67,28 @@ Hermes answers only the users in `ONEPM_ALLOWED_USERS` (comma-separated), and it
 
 `ONEPM_HOME_CHANNEL=off` (the plugin's default too) keeps Hermes from posting its "no home channel" notice on a task; set it to a task id if you want cron results delivered there.
 
-### 5. Add the OnePM tools
+The last three lines are for repositories: where the plugin keeps the clones, where the sandbox sees them, and the ssh-agent folder that step 6 mounts.
 
-The plugin carries conversations; Hermes has no OnePM tools of its own. To let the agent read and change tasks, add the OnePM MCP server to `~/.hermes/profiles/devbot/config.yaml`:
+### 4. Add the OnePM tools
 
-```yaml
-mcp_servers:
-  onepm:
-    url: https://onepm.tabsystems.tech/api/mcp
-    headers:
-      Authorization: Bearer ${ONEPM_AGENT_KEY}
+The plugin carries conversations; Hermes has no OnePM tools of its own. To let the agent read and change tasks, add the OnePM MCP server:
+
+```sh
+hermes --profile devbot config set mcp_servers.onepm.url https://onepm.tabsystems.tech/api/mcp
+hermes --profile devbot config set mcp_servers.onepm.headers.Authorization 'Bearer ${ONEPM_AGENT_KEY}'
 ```
 
 On a self-hosted instance, use its URL followed by `/api/mcp`. Hermes fills in `${ONEPM_AGENT_KEY}` from the profile's `.env`, so the key stays there. The agent's scopes decide what these tools can do.
 
-Steps 6 to 9 let the agent work in the project's repositories (see [Repositories](#repositories)). Skip them if it doesn't need to.
+Steps 5 and 6 let the agent work in the project's repositories (see [Repositories](#repositories)). Skip them if it doesn't need to.
 
-### 6. An SSH key for GitHub
+### 5. An ssh-agent the sandbox can use
 
-```sh
-mkdir -p -m 700 ~/.ssh/onepm-agent
-test -f ~/.ssh/onepm_ed25519 || ssh-keygen -t ed25519 -N "" -C "onepm@$(hostname)" -f ~/.ssh/onepm_ed25519
-ssh-keyscan github.com | tee -a ~/.ssh/known_hosts > ~/.ssh/onepm-agent/known_hosts
-cat ~/.ssh/onepm_ed25519.pub
-```
-
-Add the printed public key to GitHub: as a deploy key with write access on each repository, or to a machine user that can reach them. Prefer that over your own account's key: whoever holds the ssh-agent can use the key for everything it can reach. Check the scanned host keys against [GitHub's published fingerprints](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints).
-
-### 7. An ssh-agent the sandbox can use
+These steps assume the `hermes` user already has an SSH key that reaches the repositories on GitHub (`ssh -T git@github.com` greets you by name). Prefer a deploy key or a machine user over your own account's key: whoever holds the ssh-agent can use the key for everything it can reach.
 
 ```sh
-mkdir -p ~/.config/systemd/user
+mkdir -p -m 700 ~/.ssh/onepm-agent ~/.config/systemd/user
+ssh-keyscan github.com > ~/.ssh/onepm-agent/known_hosts
 cat > ~/.config/systemd/user/onepm-ssh-agent.service <<'EOF'
 [Unit]
 Description=ssh-agent for the OnePM Hermes gateways
@@ -101,80 +96,46 @@ Description=ssh-agent for the OnePM Hermes gateways
 [Service]
 ExecStartPre=/bin/rm -f %h/.ssh/onepm-agent/socket
 ExecStart=/usr/bin/ssh-agent -D -a %h/.ssh/onepm-agent/socket
+ExecStartPost=-/bin/sh -c 'for i in 1 2 3 4 5; do [ -S %h/.ssh/onepm-agent/socket ] && break; sleep 1; done; SSH_AUTH_SOCK=%h/.ssh/onepm-agent/socket ssh-add'
 Restart=on-failure
 
 [Install]
 WantedBy=default.target
 EOF
 systemctl --user daemon-reload
-systemctl --user enable --now onepm-ssh-agent
-SSH_AUTH_SOCK=~/.ssh/onepm-agent/socket ssh-add ~/.ssh/onepm_ed25519
+systemctl --user enable onepm-ssh-agent
+systemctl --user restart onepm-ssh-agent
 ```
 
-The socket has a fixed path, so it can be mounted into the sandbox, and the key file itself never is: the agent can ask the ssh-agent to sign, but can't copy the key. The ssh-agent keeps keys in memory, so after a reboot run the `ssh-add` line again. One ssh-agent serves every OnePM profile of this user.
+The socket has a fixed path, so it can be mounted into the sandbox, and the key file itself never is: the agent can ask the ssh-agent to sign, but can't copy the key. Each time the service starts, it loads the user's default keys (`~/.ssh/id_ed25519`, `id_rsa` and so on), so a reboot needs nothing. For a key with another name, put its path after `ssh-add`; a key with a passphrase can't be loaded unattended. Check the scanned host keys against [GitHub's published fingerprints](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints). One ssh-agent serves every OnePM profile of this user.
 
-### 8. Tell the plugin where the clones go
+### 6. Mount the clones and the ssh-agent into the sandbox
 
 ```sh
-cat >> ~/.hermes/profiles/devbot/.env <<EOF
-ONEPM_WORKSPACE=$HOME/.hermes/profiles/devbot/onepm/repos
-ONEPM_WORKSPACE_IN_SANDBOX=/workspace/repos
-ONEPM_SSH_DIR=$HOME/.ssh/onepm-agent
-EOF
+hermes --profile devbot config set terminal.backend docker
+hermes --profile devbot config set terminal.docker_run_as_host_user true
+hermes --profile devbot config set terminal.docker_volumes '["${ONEPM_WORKSPACE}:/workspace/repos", "${ONEPM_SSH_DIR}:/ssh-agent:ro"]'
+hermes --profile devbot config set --force terminal.docker_env '{"SSH_AUTH_SOCK": "/ssh-agent/socket", "GIT_SSH_COMMAND": "ssh -o UserKnownHostsFile=/ssh-agent/known_hosts"}'
 ```
 
-`$HOME` expands as you run it, so the file gets absolute paths. The plugin reads the first two; `ONEPM_SSH_DIR` is only for the `config.yaml` of the next step.
-
-### 9. Mount the clones and the ssh-agent into the sandbox
-
-Merge this into the `terminal:` section of `~/.hermes/profiles/devbot/config.yaml` (a cloned profile may already have one):
-
-```yaml
-terminal:
-  backend: docker
-  docker_run_as_host_user: true
-  docker_volumes:
-    - "${ONEPM_WORKSPACE}:/workspace/repos"
-    - "${ONEPM_SSH_DIR}:/ssh-agent:ro"
-  docker_env:
-    SSH_AUTH_SOCK: /ssh-agent/socket
-    GIT_SSH_COMMAND: ssh -o UserKnownHostsFile=/ssh-agent/known_hosts
-```
-
-Hermes fills in `${…}` from the profile's `.env`; absolute paths work too. The folder with the socket and GitHub's host keys is mounted read-only, and `docker_env` points git in the sandbox at both, so the agent can `git fetch`, `pull` and `push` there. `SSH_AUTH_SOCK` is set with `docker_env` rather than forwarded with `docker_forward_env`, because the socket's path in the sandbox differs from the host's. With `docker_run_as_host_user`, the sandbox runs as `hermes`, so it can use the socket and files it writes belong to `hermes`. Mount only the workspace: never `~/.hermes/profiles/devbot/onepm` or its `staging` folder.
+This replaces any mounts a cloned profile brought along. Hermes fills in `${…}` from the profile's `.env`; absolute paths work too. The folder with the socket and GitHub's host keys is mounted read-only, and `docker_env` points git in the sandbox at both, so the agent can `git fetch`, `pull` and `push` there. `--force` only hides a notice: Hermes reads `docker_env` but doesn't list it among its known keys. `SSH_AUTH_SOCK` is set with `docker_env` rather than forwarded with `docker_forward_env`, because the socket's path in the sandbox differs from the host's. With `docker_run_as_host_user`, the sandbox runs as `hermes`, so it can use the socket and files it writes belong to `hermes`. Mount only the workspace: never `~/.hermes/profiles/devbot/onepm` or its `staging` folder.
 
 If `git` in the sandbox fails with `No user exists for uid …`, the image has no account for `hermes`'s uid, which ssh needs. Use an image that has one, or add `"/etc/passwd:/etc/passwd:ro"` to `docker_volumes`.
 
-### 10. Run it as a service
+### 7. Run it as a service
 
 ```sh
-cat > ~/.config/systemd/user/hermes-gateway-devbot.service <<'EOF'
-[Unit]
-Description=Hermes gateway for the OnePM agent @devbot
-Wants=network-online.target
-After=network-online.target onepm-ssh-agent.service
-
-[Service]
-ExecStart=%h/.local/bin/hermes --profile devbot gateway run
-Environment=SSH_AUTH_SOCK=%h/.ssh/onepm-agent/socket
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=default.target
-EOF
-systemctl --user daemon-reload
-systemctl --user enable --now hermes-gateway-devbot
+hermes --profile devbot gateway install --start-now --start-on-login
 loginctl show-user "$USER" --property=Linger
 ```
 
-If `hermes` isn't at `~/.local/bin/hermes`, use the path `command -v hermes` prints. `SSH_AUTH_SOCK` lets the gateway's own clone use the key in the ssh-agent. `Linger=yes` keeps the service running after you log out; if it says `Linger=no`, run `sudo loginctl enable-linger hermes`. `hermes --profile devbot gateway install` writes a similar unit of its own, if you prefer it; add the `SSH_AUTH_SOCK` line to it.
+Hermes writes and starts its own `systemd --user` unit, `hermes-gateway-devbot`. The gateway clones with this user's SSH key. `Linger=yes` keeps the service running after you log out; if it says `Linger=no`, run `sudo loginctl enable-linger hermes`.
 
 Check it with `journalctl --user -u hermes-gateway-devbot -f`. The log shows `OnePM: connected to <url> as @devbot`, and `hermes --profile devbot status` lists `OnePM` under Platforms.
 
 On its first start, the plugin skips the agent's earlier events and answers only new ones. It saves its place in `~/.hermes/profiles/devbot/onepm/cursor.json`, so a restart picks up the events that arrived while the gateway was down. If you change the key or the server, the plugin starts fresh.
 
-If another session connects with the same agent key, or you rotate the key, OnePM closes this connection and the plugin stays offline. Save the new key (step 3, after removing the old line) and restart the service.
+If another session connects with the same agent key, or you rotate the key, OnePM closes this connection and the plugin stays offline. Replace the `ONEPM_AGENT_KEY` line in the profile's `.env` and run `hermes --profile devbot gateway restart`.
 
 ## Triggers
 
@@ -207,7 +168,7 @@ Settings, in the profile's `.env`:
 | `ONEPM_WORKSPACE_IN_SANDBOX` | the host path | Where the agent's tools see that same folder, such as a Docker mount. The summary gives this path. |
 | `ONEPM_GIT_URL_TEMPLATE` | `git@github.com:{owner}/{repo}.git` | The clone URL. For public repositories without SSH, use `https://github.com/{owner}/{repo}.git`. |
 
-With the settings of step 8, the clones land in `~/.hermes/profiles/devbot/onepm/repos/<owner>__<repo>` on the host, and the agent is told `/workspace/repos/<owner>__<repo>`.
+With the settings of step 3, the clones land in `~/.hermes/profiles/devbot/onepm/repos/<owner>__<repo>` on the host, and the agent is told `/workspace/repos/<owner>__<repo>`.
 
 ## Test
 
