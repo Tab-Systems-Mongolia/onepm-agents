@@ -44,12 +44,22 @@ Without a URL the plugin connects to the hosted OnePM, `https://onepm.tabsystems
 ONEPM_URL=https://onepm.example.com
 ```
 
-You can set `channels.onepm.url` and `channels.onepm.agentKey` in the config instead; the config wins over the environment.
+Keep one line for each name: when you change the key or the server, edit the line rather than adding another. The connect steps in **Project settings › Agents** ask for the key without showing it and rewrite these two lines in place, keeping the file's other settings.
 
-Then allow the OnePM users the agent answers:
+You can set `channels.onepm.url` and `channels.onepm.agentKey` in the config instead; the config wins over the environment. A key left in `channels.onepm.agentKey` therefore hides the one in `~/.openclaw/.env`, so remove it (`openclaw config unset channels.onepm.agentKey`) if you keep the key in the file.
+
+Then allow the OnePM users the agent answers. `config set` replaces the whole list, so check it first and keep the ids you still want:
 
 ```sh
+openclaw config get channels.onepm.allowFrom --json
 openclaw config set channels.onepm.allowFrom '["<user id>", "<user id>"]' --strict-json
+```
+
+To add one id and keep the others, as the connect steps do (running it again adds no duplicate):
+
+```sh
+ids=$(openclaw config get channels.onepm.allowFrom --json 2>/dev/null) || ids='[]'
+openclaw config set channels.onepm.allowFrom "$(node -e 'const [ids, id] = process.argv.slice(1); const list = JSON.parse(ids); console.log(JSON.stringify(list.map(String).includes(id) ? list : [...list, id]));' "$ids" '<user id>')" --strict-json
 ```
 
 OpenClaw drops everyone else, and it posts nothing on the task for them. There is no pairing: a task is a shared chat, so a pairing code would be public. An empty `allowFrom` drops every event. When someone outside the list asks the agent something, the gateway log shows `[onepm] dropped <kind> <event id> from <user id>: sender not allowed`; add that id if you mean to allow them.
@@ -88,13 +98,13 @@ openclaw message send --channel onepm -t task:<task id> -m "Done"
 
 ## Add the OnePM tools
 
-The plugin carries conversations. To let OpenClaw read and change tasks, also add the OnePM MCP server:
+The plugin carries conversations. To let OpenClaw read and change tasks, also add the OnePM MCP server. It's named `onepm-agent`, because `openclaw mcp set` replaces an entry of the same name, and you may already have an `onepm` entry with your own token:
 
 ```sh
-openclaw mcp set onepm '{"url":"https://onepm.tabsystems.tech/api/mcp","transport":"streamable-http","headers":{"Authorization":"Bearer ${ONEPM_AGENT_KEY}"}}'
+openclaw mcp set onepm-agent '{"url":"https://onepm.tabsystems.tech/api/mcp","transport":"streamable-http","headers":{"Authorization":"Bearer ${ONEPM_AGENT_KEY}"}}'
 ```
 
-On a self-hosted instance, use its URL followed by `/api/mcp`. OpenClaw fills in `${ONEPM_AGENT_KEY}` from `~/.openclaw/.env` when it connects. The agent's scopes decide what these tools can do.
+On a self-hosted instance, use its URL followed by `/api/mcp`. OpenClaw fills in `${ONEPM_AGENT_KEY}` from `~/.openclaw/.env` when it connects. The agent's scopes decide what these tools can do. If an earlier setup added this server as `onepm` with `${ONEPM_AGENT_KEY}`, remove that entry with `openclaw mcp unset onepm` so the tools aren't listed twice.
 
 ## Test
 
