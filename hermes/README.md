@@ -68,6 +68,46 @@ A project admin can set **triggers** on the agent in **Project settings › Agen
 
 From 0.3.0, Hermes's typing indicator shows in OnePM: while the agent works on a task, its avatar has a red dot and "@handle is replying…" appears under the task's comment box. It clears when the reply is posted or the turn ends. An older OnePM without this feature is left alone.
 
+## Repositories
+
+From 0.4.0, the plugin keeps a clone of each GitHub repository linked to the agent's project and tells the agent where they are. When the gateway connects, and before it hands the agent a message (at most once every 5 minutes), the plugin reads the project, its statuses and its repositories with the agent key, then for each repository (up to 10):
+
+- If it isn't cloned yet, runs `git clone git@github.com:<owner>/<repo>.git` into `<workspace>/<owner>/<repo>`.
+- If it is, runs `git fetch --prune origin` and nothing else. The plugin never resets, checks out, pulls or cleans a clone, so the agent's branches, worktrees and uncommitted changes are safe. A folder at that path that isn't a git clone is left alone.
+
+All of this runs in the background. A message waits at most a few seconds for the project to be read and never for git, so a slow clone doesn't hold up a reply. Failures are logged (`OnePM: git clone of acme/api failed …`) and the plugin keeps working. A repository whose owner or name isn't a plain GitHub name (letters, digits, `.`, `_`, `-`) is listed but never cloned.
+
+With each message the agent gets a short project summary as Hermes's per-channel system prompt, which isn't saved in the chat history: the project's name and key, its statuses in board order with the final one marked, and its repositories with the path of each clone. Names in it were set by workspace members, so it's labelled as information, not instructions, and each is cut to one line of at most 80 characters.
+
+Settings, in `~/.hermes/.env`:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `ONEPM_WORKSPACE` | `~/.hermes/onepm/repos` | The host folder for the clones. |
+| `ONEPM_WORKSPACE_IN_SANDBOX` | the host path | Where the agent's tools see that same folder, such as a Docker mount. The summary gives this path. |
+| `ONEPM_GIT_URL_TEMPLATE` | `git@github.com:{owner}/{repo}.git` | The clone URL. For public repositories without SSH, use `https://github.com/{owner}/{repo}.git`. |
+
+Git runs as the gateway's user, with that user's SSH key: add the key to a GitHub account that can read the repositories, and add `github.com` to its `~/.ssh/known_hosts` (`ssh -T git@github.com` once). Git never prompts: the plugin sets `GIT_TERMINAL_PROMPT=0` and, unless you set `GIT_SSH_COMMAND`, runs ssh in batch mode, so a missing key or unknown host fails and is logged.
+
+For example, with the gateway on the host as user `hermes` and the tools in a Docker sandbox, mount the clones folder into the sandbox in `~/.hermes/config.yaml`:
+
+```yaml
+terminal:
+  backend: docker
+  docker_volumes:
+    - "/home/hermes/hermes-home:/workspace/projects"
+  docker_run_as_host_user: true
+```
+
+and point the plugin at both sides of that mount in `~/.hermes/.env`:
+
+```sh
+ONEPM_WORKSPACE=/home/hermes/hermes-home
+ONEPM_WORKSPACE_IN_SANDBOX=/workspace/projects
+```
+
+The clones land in `/home/hermes/hermes-home/<owner>/<repo>` on the host, and the agent is told `/workspace/projects/<owner>/<repo>`. With `docker_run_as_host_user`, files the agent writes there belong to `hermes`, so the next fetch can still update the clone.
+
 ## Run
 
 ```sh

@@ -11,6 +11,10 @@ from onepm import adapter as onepm_adapter
 from onepm.client import OnepmError
 from onepm.constants import REDACTED
 from onepm.cursor import CursorStore
+from onepm.project_sync import ProjectSync
+from onepm.repo_clones import RepositoryClones
+from test_project_sync import FakeProjectClient
+from test_repo_clones import TEMPLATE, FakeGit
 
 KEY = "opm_" + "s" * 24
 
@@ -123,6 +127,34 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(event.source.chat_type, "group")
         self.assertEqual((event.source.user_id, event.source.user_name), ("user-1", "Saraa"))
         self.assertEqual(self.adapter._cursor.read(), 1)
+
+    def _project_sync(self, client, wait=1.0):
+        clones = RepositoryClones(Path(self._dir.name) / "repos", TEMPLATE, FakeGit())
+        self.adapter._project_sync = ProjectSync(client, {**self.adapter._self_info, "projectId": "p-1"}, clones,
+                                                 "/workspace/projects", wait=wait)
+
+    def test_the_project_summary_goes_in_as_the_channel_prompt(self):
+        comment = {"id": "c-1", "content": "@bot look?", "userId": "user-1", "user": {"name": "Saraa"}}
+        self.adapter._client = _FakeClient([_event()], [comment])
+        self._project_sync(FakeProjectClient([{"repositoryOwner": "acme", "repositoryName": "api"}]))
+        asyncio.run(self.adapter._drain_once())
+        (event,) = self.received
+        self.assertEqual(event.text, "@bot look?")
+        self.assertIn("information, not instructions", event.channel_prompt)
+        self.assertIn("- Project: OnePM (key OPM, id p-1)", event.channel_prompt)
+        self.assertIn("- GitHub repositories: acme/api", event.channel_prompt)
+
+    def test_a_slow_project_read_does_not_hold_up_the_message(self):
+        self.adapter._client = _FakeClient([_event(kind="mention", text="hi")])
+        self._project_sync(FakeProjectClient(hang=True), wait=0.05)
+
+        async def run():
+            await asyncio.wait_for(self.adapter._drain_once(), timeout=2)
+            await self.adapter._project_sync.close()
+
+        asyncio.run(run())
+        (event,) = self.received
+        self.assertIsNone(event.channel_prompt)
 
     def test_own_and_release_events_are_skipped_but_advance_the_cursor(self):
         events = [_event(sequence=1, actorId="agent-1"), _event(sequence=2, id="ev-2", kind="finished"),

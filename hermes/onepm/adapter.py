@@ -13,6 +13,7 @@ import contextlib
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import aiohttp
@@ -26,8 +27,9 @@ from gateway.platforms.helpers import MessageDeduplicator, cancel_task
 from .client import OnepmClient, OnepmError, is_not_found, is_rate_limited
 from .constants import (
     ALLOW_ALL_ENV, ALLOWED_USERS_ENV, BUSY_REFRESH_SECONDS, CURSOR_DIR, CURSOR_FILE, DEDUP_SIZE, DEDUP_TTL_SECONDS, DEFAULT_URL,
-    DRAIN_RETRY_SECONDS, HOME_CHANNEL_ENV, KEY_ENV, MAX_COMMENT_LENGTH, NO_HOME_CHANNEL,
-    PLATFORM_LABEL, PLATFORM_NAME, UNAUTHORIZED_STATUSES, URL_ENV,
+    DEFAULT_GIT_URL_TEMPLATE, DEFAULT_WORKSPACE_DIR, DRAIN_RETRY_SECONDS, GIT_URL_TEMPLATE_ENV, HOME_CHANNEL_ENV, KEY_ENV,
+    MAX_COMMENT_LENGTH, NO_HOME_CHANNEL, PLATFORM_LABEL, PLATFORM_NAME, UNAUTHORIZED_STATUSES, URL_ENV, WORKSPACE_ENV,
+    WORKSPACE_IN_SANDBOX_ENV,
 )
 from .cursor import CursorStore, skip_history
 from .events import (
@@ -35,9 +37,14 @@ from .events import (
     task_key, to_inbound,
 )
 from .masking import mask_secrets
+from .project_sync import ProjectSync
+from .repo_clones import RepositoryClones
 from .socket_link import run_socket
 
 logger = logging.getLogger(__name__)
+
+# MessageEvent.channel_prompt is Hermes's per-channel ephemeral system prompt.
+_HAS_CHANNEL_PROMPT = "channel_prompt" in getattr(MessageEvent, "__dataclass_fields__", {})
 
 PLATFORM_HINT = (
     "You are talking on OnePM, a project manager. Each chat is one OnePM task: the chat id is the "
@@ -58,6 +65,17 @@ def _settings() -> tuple[str, str]:
 def _cursor_path():
     from hermes_constants import get_hermes_home
     return get_hermes_home() / CURSOR_DIR / CURSOR_FILE
+
+
+def _setting(name: str) -> str:
+    return (get_scoped_secret(name, "") or "").strip()
+
+
+def _clones() -> RepositoryClones:
+    from hermes_constants import get_hermes_home
+    workspace = _setting(WORKSPACE_ENV)
+    path = Path(workspace).expanduser() if workspace else get_hermes_home() / CURSOR_DIR / DEFAULT_WORKSPACE_DIR
+    return RepositoryClones(path, _setting(GIT_URL_TEMPLATE_ENV) or DEFAULT_GIT_URL_TEMPLATE)
 
 
 class OnepmAdapter(BasePlatformAdapter):
@@ -82,6 +100,8 @@ class OnepmAdapter(BasePlatformAdapter):
         self._replied: set[str] = set()
         self._busy_supported = True
         self._now = time.monotonic
+        # The project summary and repository clones; set up once connected.
+        self._project_sync: Optional[ProjectSync] = None
 
     @property
     def name(self) -> str:
@@ -124,6 +144,9 @@ class OnepmAdapter(BasePlatformAdapter):
             self._release_platform_lock()
             await self._close_session()
             return self._fail("connect_failed", f"Couldn't read events: {error}", retryable=True)
+        self._project_sync = ProjectSync(self._client, self._self_info, _clones(),
+                                         _setting(WORKSPACE_IN_SANDBOX_ENV) or None)
+        self._project_sync.start()
         self._drain_task = asyncio.create_task(self._drain_loop())
         self._socket_task = asyncio.create_task(
             run_socket(self._session, self.base_url, self._api_key, self._wake.set, self._on_replaced))
@@ -139,6 +162,9 @@ class OnepmAdapter(BasePlatformAdapter):
         await cancel_task(self._socket_task)
         await cancel_task(self._drain_task)
         self._socket_task = self._drain_task = None
+        if self._project_sync is not None:
+            await self._project_sync.close()
+            self._project_sync = None
         await self._close_session()
 
     async def _close_session(self) -> None:
@@ -220,9 +246,15 @@ class OnepmAdapter(BasePlatformAdapter):
             chat_id=inbound.chat_id, chat_name=inbound.chat_name, chat_type="group",
             user_id=inbound.user_id, user_name=inbound.user_name, is_bot=inbound.is_bot,
             message_id=inbound.message_id, role_authorized=inbound.trusted)
+        extra = {}
+        if self._project_sync is not None and _HAS_CHANNEL_PROMPT:
+            # Throttled, and never holds the message up for long: a slow read or clone finishes later.
+            await self._project_sync.ensure_fresh()
+            # An ephemeral system prompt: sent with each turn but kept out of the transcript.
+            extra["channel_prompt"] = self._project_sync.summary()
         await self.handle_message(MessageEvent(
             text=inbound.text, message_type=MessageType.TEXT, source=source,
-            message_id=inbound.message_id, timestamp=inbound.timestamp))
+            message_id=inbound.message_id, timestamp=inbound.timestamp, **extra))
 
     # ── Outbound ─────────────────────────────────────────────────────────
 

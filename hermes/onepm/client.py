@@ -32,6 +32,16 @@ class OnepmClient:
     async def self_info(self) -> dict:
         return await self._request("GET", "/project-agent/self")
 
+    async def project(self, project_id: str) -> dict:
+        return await self._request("GET", f"/project/{quote(project_id, safe='')}")
+
+    async def columns(self, project_id: str) -> list:
+        return await self._request("GET", f"/column/{quote(project_id, safe='')}")
+
+    async def repositories(self, project_id: str) -> list:
+        """The project's linked GitHub repositories, each with repositoryOwner and repositoryName."""
+        return await self._request("GET", f"/github-repository/project/{quote(project_id, safe='')}")
+
     async def events(self, after: Optional[int]) -> list:
         query = "" if after is None else f"?after={after}"
         return await self._request("GET", f"/project-agent/events{query}")

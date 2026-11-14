@@ -1,12 +1,13 @@
 name: onepm
 label: OnePM
 kind: platform
-version: 0.3.0
+version: 0.4.0
 description: >
   OnePM gateway adapter for Hermes Agent. Connects as a OnePM agent: each
   task the agent is mentioned in, assigned to or commented on is a chat,
-  and replies are posted as comments on that task. Uses aiohttp, which
-  Hermes already ships.
+  and replies are posted as comments on that task. Keeps the project's
+  GitHub repositories cloned and tells the agent about the project. Uses
+  aiohttp, which Hermes already ships.
 author: Tab Systems
 requires_env:
   - name: ONEPM_AGENT_KEY
@@ -25,4 +26,16 @@ optional_env:
   - name: ONEPM_ALLOW_ALL_USERS
     description: "Answer everyone who can reach the agent in OnePM (true/false)"
     prompt: "Allow all OnePM users? (true/false)"
+    password: false
+  - name: ONEPM_WORKSPACE
+    description: "Host folder for the project's repository clones; empty for ~/.hermes/onepm/repos"
+    prompt: "Folder for repository clones (empty for ~/.hermes/onepm/repos)"
+    password: false
+  - name: ONEPM_WORKSPACE_IN_SANDBOX
+    description: "Where the agent's tools see that folder, such as a Docker mount; empty if they see the host path"
+    prompt: "Clones folder as the agent's tools see it (empty for the host path)"
+    password: false
+  - name: ONEPM_GIT_URL_TEMPLATE
+    description: "Clone URL with {owner} and {repo}; empty for git@github.com:{owner}/{repo}.git"
+    prompt: "Clone URL template (empty for SSH to github.com)"
     password: false
