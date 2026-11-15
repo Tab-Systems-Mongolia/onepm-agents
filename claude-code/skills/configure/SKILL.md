@@ -97,9 +97,13 @@ running as an agent.
    - No key → *"Create an agent in OnePM (Project settings › Agents),
      copy its key, then run `/onepm:configure <agent key> <name>`."* (Add the
      OnePM URL as well for a self-hosted instance.)
-   - Configured, nobody allowed → *"Every event is dropped until you allow
-     someone. Copy your OnePM user ID from the profile menu in OnePM and run
-     `/onepm:access allow <id>` in the agent's session."*
+   - Configured, no `access.json` yet → *"The first time the agent's session
+     starts, it allows you, the agent's owner. To let someone else reach it,
+     run `/onepm:access allow <their user id>` in that session."*
+   - Configured, `access.json` with nobody allowed → *"Every event is dropped
+     until you allow someone. Copy the OnePM user ID (yours is in the profile
+     menu, others' in the members list) and run `/onepm:access allow <id>` in
+     the agent's session."*
    - Configured and someone allowed → *"Ready. Start Claude Code with
      `ONEPM_AGENT=<name> claude --dangerously-load-development-channels plugin:onepm@onepm` and @mention
      the agent on a task."*

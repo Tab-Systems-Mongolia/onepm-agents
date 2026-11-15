@@ -20,6 +20,15 @@ export const normalizeAccess = (raw) => {
   return { allowFrom, requireMention: raw.requireMention !== false };
 };
 
+// The allowlist a profile starts with: the agent's owner, as the server names
+// them for this agent's key. Null when the server didn't say (an older
+// server), so the profile keeps today's empty default.
+export const ownerAccess = (self) => {
+  const ownerId = typeof self?.ownerId === "string" ? self.ownerId.trim() : "";
+  if (!ownerId || ownerId === self.id) return null;
+  return { allowFrom: [ownerId], requireMention: true };
+};
+
 export const isDeliverableKind = (kind) =>
   Object.values(EVENT_KINDS).includes(kind);
 

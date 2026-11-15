@@ -50,6 +50,12 @@ Arguments passed: `$ARGUMENTS`
 
 Missing file = `{"allowFrom": [], "requireMention": true}`.
 
+The channel creates the file once, the first time the profile starts without
+one: it allows only the agent's owner (the id OnePM gives for the agent key)
+with mentions required. It never changes the file after that, so the owner
+doesn't need to allow themself, and an owner who removes themself stays
+removed. A file written here before that first start is kept as it is.
+
 - `allowFrom` — OnePM user ids whose events reach the session. Empty or
   missing drops **everything**. There is no pairing: a pairing code would be
   posted on a task the whole workspace can read.
@@ -91,6 +97,7 @@ Parse `$ARGUMENTS` (space-separated). If empty or unrecognized, show status.
 
 1. Read, filter `allowFrom` to exclude `<id>`, write.
 2. Confirm. If `allowFrom` is now empty, say that every event is dropped.
+   The channel won't add the owner back.
 
 ### `mention on` / `mention off`
 

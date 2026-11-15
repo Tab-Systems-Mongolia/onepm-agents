@@ -83,15 +83,23 @@ a normal session and it offers to move those files into a profile.
 
 ## Allow who can reach you
 
-Nobody can reach the session until you allow them. An empty allowlist drops
-every event. There's no pairing code, because it would be posted on a task
-that the whole workspace can read.
+You, the agent's owner, are allowed already. From 0.7.0, the first time a
+profile starts and has no `access.json`, the channel creates one that allows
+only the owner, with mentions required. It takes the owner's ID from OnePM's
+answer for the agent key (`GET /api/project-agent/self`), never from a task or
+comment. It never changes an `access.json` that exists, so if you remove
+yourself, you stay removed. With an older OnePM that doesn't name the owner,
+nothing is created and you allow yourself as below.
 
-Copy your OnePM user ID from the profile menu in OnePM (the members list
-shows everyone's), then, in the agent's session:
+Everyone else is dropped until you allow them. An empty allowlist drops every
+event. There's no pairing code, because it would be posted on a task that the
+whole workspace can read.
+
+To let someone else reach the agent, copy their OnePM user ID from the members
+list (your own is in the profile menu), then, in the agent's session:
 
 ```
-/onepm:access allow <your user id>
+/onepm:access allow <their user id>
 ```
 
 | Command | What it does |

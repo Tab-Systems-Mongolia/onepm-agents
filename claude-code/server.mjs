@@ -9,7 +9,8 @@
 // it stays idle. A profile's state lives in ~/.claude/channels/onepm/<name>/
 // (or $ONEPM_STATE_DIR):
 //   .env         ONEPM_URL and ONEPM_AGENT_KEY, written by /onepm:configure
-//   access.json  { allowFrom, requireMention }, managed by /onepm:access
+//   access.json  { allowFrom, requireMention }, managed by /onepm:access;
+//                created on first start with the agent's owner allowed
 //   cursor.json  the last event handled
 //   dropped.json the last senders who weren't on the allowlist
 import { homedir } from "node:os";
@@ -51,6 +52,7 @@ import { createBusyTracker } from "./src/services/busyTracker.mjs";
 import { createTaskSlots } from "./src/services/taskSlots.mjs";
 import { createEventFeed } from "./src/services/eventFeed.mjs";
 import { createOnepmClient } from "./src/services/onepmClient.mjs";
+import { allowOwnerOnFirstStart } from "./src/services/ownerAccess.mjs";
 import { loadProjectContext } from "./src/services/projectContext.mjs";
 import { connectRemoteMcp } from "./src/services/remoteMcpClient.mjs";
 import { createRemoteTools } from "./src/services/remoteTools.mjs";
@@ -201,6 +203,7 @@ const start = async () => {
     return;
   }
   log(`signed in as @${self.handle} (agent ${self.id})`);
+  allowOwnerOnFirstStart({ state, self, log });
   const feed = createEventFeed({
     client,
     state,

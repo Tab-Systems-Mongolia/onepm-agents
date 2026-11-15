@@ -1,5 +1,6 @@
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   renameSync,
@@ -70,6 +71,25 @@ export const createStateFiles = (dir, log = () => {}) => {
           `${accessPath} isn't valid JSON; dropping every event until it is fixed`,
         );
       return normalizeAccess(value);
+    },
+
+    hasAccessFile: () => existsSync(accessPath),
+
+    // Writes access.json only when it doesn't exist yet: the exclusive create
+    // never replaces a list the owner set, even one they emptied on purpose.
+    // True when it was written.
+    createAccessIfMissing: (access) => {
+      mkdirSync(dir, { recursive: true, mode: PRIVATE_DIR_MODE });
+      try {
+        writeFileSync(accessPath, `${JSON.stringify(access, null, 2)}\n`, {
+          mode: PRIVATE_FILE_MODE,
+          flag: "wx",
+        });
+        return true;
+      } catch (error) {
+        if (error?.code === "EEXIST") return false;
+        throw error;
+      }
     },
 
     // The cursor belongs to one agent on one server; another key starts over.
