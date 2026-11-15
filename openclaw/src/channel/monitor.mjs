@@ -1,5 +1,10 @@
 import { join } from "node:path";
-import { POLL_MS, SELF_RETRY_MS, STATE_SUBDIR } from "../constants/onepm.mjs";
+import {
+  ALLOW_EVERYONE,
+  POLL_MS,
+  SELF_RETRY_MS,
+  STATE_SUBDIR,
+} from "../constants/onepm.mjs";
 import { connectAgentSocket } from "../services/agentSocket.mjs";
 import { createBusyMarker } from "../services/busyTyping.mjs";
 import { createCursorFile } from "../services/cursorFile.mjs";
@@ -45,6 +50,23 @@ export const startOnepmMonitor = ({
     }
     if (stopped) return;
     log(`signed in as @${self.handle} (agent ${self.id})`);
+    // OnePM refuses assignments and mentions from anyone not on allowFrom.
+    // Sent on each start, so a changed list reaches OnePM on the restart.
+    // OnePM takes named users only: "*" would be refused, so it stays local.
+    const named = account.allowFrom.filter(
+      (id) => !id.includes(ALLOW_EVERYONE),
+    );
+    if (named.length < account.allowFrom.length) {
+      log(
+        "allowFrom's * applies here only: in OnePM, only the named users and the owner can assign or mention the agent",
+      );
+    }
+    try {
+      await client.reportAccess(named);
+    } catch (error) {
+      // An older OnePM has no such route; the allowlist still applies here.
+      log(`couldn't report who may reach the agent: ${errorText(error)}`);
+    }
     const feed = createEventFeed({
       client,
       cursor: createCursorFile(stateDir, {

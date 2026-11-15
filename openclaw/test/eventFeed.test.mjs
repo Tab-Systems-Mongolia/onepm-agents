@@ -220,3 +220,32 @@ describe("drain", () => {
     assert.equal(cursor.read(), 1);
   });
 });
+
+// ONEPM-202: the owner's place on allowFrom is for the owner in person.
+describe("an agent named as its owner", () => {
+  const owned = { ...self, ownerId: "owner-1" };
+
+  it("is dropped before anything is read, and the owner in person isn't", async () => {
+    const client = fakeClient([
+      event(1, { actorId: "owner-1", actorSource: "agent" }),
+      event(2, {
+        actorId: "owner-1",
+        actorSource: "agent",
+        actorKind: "agent",
+      }),
+      event(3, {
+        actorId: "owner-1",
+        actorSource: "browser",
+        actorKind: "person",
+      }),
+    ]);
+    const cursor = memoryCursor(0);
+    const { feed, handled } = feedWith(client, cursor, { self: owned });
+    await feed.drain();
+    assert.deepEqual(
+      handled.map(({ item }) => item.id),
+      ["e3"],
+    );
+    assert.equal(cursor.read(), 3);
+  });
+});

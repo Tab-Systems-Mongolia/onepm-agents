@@ -1,5 +1,7 @@
 import {
+  AGENT_ACTOR_SOURCE,
   EVENT_KINDS,
+  PERSON_ACTOR_KIND,
   TRIGGER_KINDS,
   TRIGGER_SOURCE,
 } from "../constants/onepm.mjs";
@@ -37,12 +39,23 @@ export const isDeliverableKind = (kind) =>
 export const isTriggerEvent = (event) =>
   event.actorSource === TRIGGER_SOURCE && TRIGGER_KINDS.includes(event.kind);
 
+// Whether an event names the agent's owner for something the owner didn't
+// do in person: another agent of theirs, acting with its own key, as older
+// OnePM servers reported it. The owner's place on the list is only theirs.
+export const borrowsOwner = (event, ownerId) =>
+  Boolean(ownerId) &&
+  event.actorId === ownerId &&
+  (event.actorKind
+    ? event.actorKind !== PERSON_ACTOR_KIND
+    : event.actorSource === AGENT_ACTOR_SOURCE);
+
 // Whether the sender may reach the session at all. Checked before anything
 // is fetched for the event. Trigger events have no sender to check.
-export const isAllowedSender = (event, access, selfId) =>
+export const isAllowedSender = (event, access, selfId, ownerId = null) =>
   isTriggerEvent(event) ||
   (Boolean(event.actorId) &&
     event.actorId !== selfId &&
+    !borrowsOwner(event, ownerId) &&
     access.allowFrom.includes(event.actorId));
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

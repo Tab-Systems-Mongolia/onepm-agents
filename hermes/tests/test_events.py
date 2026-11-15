@@ -1,7 +1,8 @@
 import unittest
 
 from onepm.events import (
-    find_comment, is_request, is_trigger, needs_comment, needs_task, readable_text, to_inbound,
+    allows_everyone, borrows_owner, find_comment, is_request, is_trigger, needs_comment, needs_task, readable_text,
+    reported_allow_from, to_inbound,
 )
 
 AGENT = "agent-1"
@@ -166,3 +167,26 @@ class FindCommentTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AllowlistTest(unittest.TestCase):
+    def test_another_agent_named_as_the_owner_borrows_their_place(self):
+        self.assertTrue(borrows_owner(_event(actorId="owner-1", actorSource="agent"), "owner-1"))
+        self.assertTrue(borrows_owner(
+            _event(actorId="owner-1", actorSource="agent", actorKind="agent"), "owner-1"))
+
+    def test_the_owner_in_person_and_other_agents_do_not(self):
+        self.assertFalse(borrows_owner(_event(actorId="owner-1"), "owner-1"))
+        self.assertFalse(borrows_owner(_event(actorId="owner-1", actorKind="person"), "owner-1"))
+        self.assertFalse(borrows_owner(_event(actorId="agent-2", actorSource="agent"), "owner-1"))
+        self.assertFalse(borrows_owner(_event(actorId="owner-1", actorSource="agent"), None))
+
+    def test_the_reported_list_is_the_allowed_users_and_the_owner(self):
+        self.assertEqual(reported_allow_from(" u2, u1 ,,u2", "owner-1"), ["owner-1", "u1", "u2"])
+        self.assertEqual(reported_allow_from("", None), [])
+
+    def test_a_wildcard_is_never_reported(self):
+        self.assertEqual(reported_allow_from("*,u1", "owner-1"), ["owner-1", "u1"])
+        self.assertTrue(allows_everyone("true"))
+        self.assertFalse(allows_everyone(""))
+

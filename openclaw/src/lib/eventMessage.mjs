@@ -1,6 +1,8 @@
 import {
+  AGENT_ACTOR_SOURCE,
   ALLOW_EVERYONE,
   EVENT_KINDS,
+  PERSON_ACTOR_KIND,
   PULL_REQUEST_ACTION_TEXT,
   TRIGGER_KINDS,
   TRIGGER_SENDER_ID,
@@ -56,6 +58,16 @@ export const isRequest = (event, selfId) =>
   (isTriggerEvent(event) || Boolean(event.actorId)) &&
   event.actorId !== selfId &&
   Boolean(event.taskId);
+
+// Whether an event names the agent's owner for something the owner didn't
+// do in person: another agent of theirs, acting with its own key, as older
+// OnePM servers reported it. The owner's place on allowFrom is only theirs.
+export const borrowsOwner = (event, ownerId) =>
+  Boolean(ownerId) &&
+  event?.actorId === ownerId &&
+  (event.actorKind
+    ? event.actorKind !== PERSON_ACTOR_KIND
+    : event.actorSource === AGENT_ACTOR_SOURCE);
 
 // Who OpenClaw's ingress sees as the sender, and the gates it applies. A
 // trigger is from OnePM, so no allowlist or mention gate stands in its way.

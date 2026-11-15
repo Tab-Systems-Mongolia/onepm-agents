@@ -58,6 +58,10 @@ class _FakeClient:
         self.posted.append((task_id, content))
         return {"id": "c-new"}
 
+    async def report_access(self, allow_from):
+        self.reported = allow_from
+        return {"allowFrom": allow_from}
+
     async def set_busy(self, task_id, busy):
         self.busy.append((task_id, busy))
         if self.busy_error:
@@ -93,6 +97,12 @@ class AdapterTest(unittest.TestCase):
         self._dir.cleanup()
         for name in ("ONEPM_URL", "ONEPM_AGENT_KEY"):
             os.environ.pop(name, None)
+
+    def test_the_hint_says_how_to_mention_someone(self):
+        self.assertIn(
+            'To mention someone in a reply, write <kaneo-mention id="<user id>" label="<name>">@<name></kaneo-mention>; '
+            "the sender's id is the message's user_id, others come from list_workspace_members.",
+            onepm_adapter.PLATFORM_HINT)
 
     def test_registers_the_onepm_platform(self):
         self.assertTrue(platform_registry.is_registered("onepm"))
@@ -203,6 +213,26 @@ class AdapterTest(unittest.TestCase):
             asyncio.run(self.adapter._drain_once())
         self.assertEqual(logs.output,
                          ["WARNING:onepm.adapter:Unauthorized user: user-9 (Robin) on onepm"])
+
+    def test_another_agent_named_as_the_owner_is_refused_before_anything_is_read(self):
+        self.adapter._self_info = {**self.adapter._self_info, "ownerId": "owner-1"}
+        self.adapter.set_authorization_check(lambda *args, **kwargs: True)
+        client = self.adapter._client = _FakeClient(
+            [_event(kind="assignment", commentId=None, actorId="owner-1", actorSource="agent")])
+        with self.assertLogs("onepm.adapter", level="WARNING"):
+            asyncio.run(self.adapter._drain_once())
+        self.assertEqual(client.fetched, [])
+        self.assertEqual(self.received, [])
+
+    def test_reports_the_allowed_users_and_the_owner(self):
+        self.adapter._self_info = {**self.adapter._self_info, "ownerId": "owner-1"}
+        client = self.adapter._client = _FakeClient([])
+        os.environ["ONEPM_ALLOWED_USERS"] = "u1"
+        try:
+            asyncio.run(self.adapter._report_access())
+        finally:
+            os.environ.pop("ONEPM_ALLOWED_USERS", None)
+        self.assertEqual(client.reported, ["owner-1", "u1"])
 
     def test_an_event_without_an_actor_is_still_fetched(self):
         self.adapter.set_authorization_check(lambda *args, **kwargs: False)

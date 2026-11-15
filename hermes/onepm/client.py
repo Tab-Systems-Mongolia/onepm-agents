@@ -55,6 +55,10 @@ class OnepmClient:
     async def post_comment(self, task_id: str, content: str) -> dict:
         return await self._request("POST", f"/comment/{quote(task_id, safe='')}", {"content": content})
 
+    async def report_access(self, allow_from: list) -> dict:
+        """Who may assign or mention the agent; OnePM refuses anyone else."""
+        return await self._request("PUT", "/project-agent/access", {"allowFrom": allow_from})
+
     async def set_busy(self, task_id: str, busy: bool) -> dict:
         """Shows people the agent is writing a reply on the task."""
         return await self._request("POST", "/project-agent/busy", {"taskId": task_id, "busy": busy})

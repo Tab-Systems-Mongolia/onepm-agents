@@ -12,6 +12,8 @@ from typing import Optional
 
 from .constants import (
     AGENT_ACTOR_SOURCE,
+    PERSON_ACTOR_KIND,
+    TRUTHY_VALUES,
     ANY_TAG_PATTERN,
     ENTITIES,
     ENTITY_PATTERN,
@@ -26,6 +28,7 @@ from .constants import (
     TRIGGER_SENDER_ID,
     TRIGGER_SENDER_NAME,
     UNNAMED_MENTION,
+    WILDCARD,
 )
 
 _MENTION_TAG = re.compile(MENTION_TAG_PATTERN, re.IGNORECASE)
@@ -104,6 +107,30 @@ def trigger_text(event: dict) -> str:
 
 def is_agent_actor(event: dict) -> bool:
     return event.get("actorSource") == AGENT_ACTOR_SOURCE
+
+
+def borrows_owner(event: dict, owner_id: Optional[str]) -> bool:
+    """Whether the event names the agent's owner for something they didn't do in person: another of
+    their agents acting with its own key, as older OnePM servers reported it. The owner's place on
+    the allowlist is only theirs."""
+    if not owner_id or event.get("actorId") != owner_id:
+        return False
+    kind = event.get("actorKind")
+    return kind != PERSON_ACTOR_KIND if kind else is_agent_actor(event)
+
+
+def allows_everyone(allow_all: str) -> bool:
+    return allow_all.strip().lower() in TRUTHY_VALUES
+
+
+def reported_allow_from(allowed_users: str, owner_id: Optional[str]) -> list:
+    """Who may assign or mention the agent, as OnePM is told: ONEPM_ALLOWED_USERS plus the owner.
+    OnePM takes named users only, so ONEPM_ALLOW_ALL_USERS can't be passed on and a wildcard is
+    left out."""
+    ids = {part.strip() for part in allowed_users.split(",") if part.strip() and WILDCARD not in part}
+    if owner_id:
+        ids.add(str(owner_id))
+    return sorted(ids)
 
 
 def needs_task(event: dict) -> bool:

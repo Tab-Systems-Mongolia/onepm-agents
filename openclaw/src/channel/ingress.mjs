@@ -1,7 +1,11 @@
 import { createChannelInboundEnvelopeBuilderAsync } from "openclaw/plugin-sdk/channel-inbound";
 import { defineStableChannelIngressIdentity } from "openclaw/plugin-sdk/channel-ingress-runtime";
 import { resolveAgentRoute } from "openclaw/plugin-sdk/routing";
-import { CHANNEL_ID, CHANNEL_LABEL } from "../constants/onepm.mjs";
+import {
+  CHANNEL_ID,
+  CHANNEL_LABEL,
+  REPLY_INSTRUCTIONS,
+} from "../constants/onepm.mjs";
 import { normalizeAllowEntry, taskTarget } from "../lib/account.mjs";
 import {
   addressesAgent,
@@ -168,7 +172,10 @@ export const handleOnepmInbound = async ({
       commands: { authorized: false },
       mentions: { canDetectMention: true, wasMentioned },
     },
-    extra: { GroupSubject: message.chatLabel },
+    extra: {
+      GroupSubject: message.chatLabel,
+      GroupSystemPrompt: REPLY_INSTRUCTIONS,
+    },
   });
   const dispatch = () =>
     core.channel.inbound.dispatch({

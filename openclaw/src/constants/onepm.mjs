@@ -59,6 +59,13 @@ export const EVENT_KINDS = {
 // OnePM itself, past the allowlist and the mention gate.
 export const TRIGGER_KINDS = [EVENT_KINDS.status, EVENT_KINDS.pullRequest];
 export const TRIGGER_SOURCE = "trigger";
+// Given to the agent with every OnePM message, as the group's prompt.
+export const REPLY_INSTRUCTIONS =
+  'To mention someone in a reply, write <kaneo-mention id="<user id>" label="<name>">@<name></kaneo-mention>; the sender\'s id is the message\'s user_id, others come from list_workspace_members.';
+// An event an agent caused with its own key. OnePM names the agent as the
+// actor and sets actorKind; older servers named its owner instead.
+export const AGENT_ACTOR_SOURCE = "agent";
+export const PERSON_ACTOR_KIND = "person";
 export const TRIGGER_SENDER_ID = "onepm";
 export const TRIGGER_SENDER_NAME = "OnePM";
 export const ALLOW_EVERYONE = "*";

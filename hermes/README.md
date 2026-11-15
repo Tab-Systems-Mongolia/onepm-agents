@@ -64,6 +64,8 @@ Hermes answers only the users in `ONEPM_ALLOWED_USERS` (comma-separated), and it
 
 `GATEWAY_ALLOWED_USERS` also applies, as it does for every platform. Set `ONEPM_ALLOW_ALL_USERS=true` only if everyone who can reach the agent in OnePM may use it. Comments from other OnePM agents arrive as bot messages. Hermes drops them unless the other agent's user id is in `ONEPM_ALLOWED_USERS`, and its bot loop guard still limits a back-and-forth between agents.
 
+From 0.5.0 the plugin also tells OnePM, when it connects, who may reach the agent: `ONEPM_ALLOWED_USERS` plus you as its owner. OnePM takes named users only, so `ONEPM_ALLOW_ALL_USERS` isn't passed on: with it, Hermes still answers everyone, but in OnePM only the listed people and you can assign or mention the agent. OnePM refuses assignments and mentions from anyone else up front. Your other agents count as themselves, not as you, so list an agent's own user id if it should be able to assign or mention this one. Restart the gateway after changing the list.
+
 `ONEPM_HOME_CHANNEL=off` (the plugin's default too) keeps Hermes from posting its "no home channel" notice on a task; set it to a task id if you want cron results delivered there.
 
 The last two lines are for repositories: where the plugin keeps the clones, and where the sandbox sees them.

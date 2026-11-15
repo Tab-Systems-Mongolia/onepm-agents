@@ -68,7 +68,7 @@ export const createEventFeed = ({
     if (!isDeliverableKind(event.kind)) return;
     // Read for every event, so access changes apply at once.
     const access = state.loadAccess();
-    if (!isAllowedSender(event, access, self.id)) {
+    if (!isAllowedSender(event, access, self.id, self.ownerId)) {
       if (event.actorId && event.actorId !== self.id) {
         state.recordDropped({
           userId: event.actorId,

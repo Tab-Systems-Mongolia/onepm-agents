@@ -72,6 +72,12 @@ export const EVENT_KINDS = {
 // the agent. They come from OnePM, not a person, so no allowlist applies.
 export const TRIGGER_KINDS = [EVENT_KINDS.status, EVENT_KINDS.pullRequest];
 export const TRIGGER_SOURCE = "trigger";
+// An event an agent caused with its own key. OnePM names the agent as the
+// actor and sets actorKind; older servers named its owner instead.
+export const AGENT_ACTOR_SOURCE = "agent";
+export const PERSON_ACTOR_KIND = "person";
+// What OnePM refuses in a reported allowlist: it takes named users only.
+export const WILDCARD = "*";
 // Who a trigger message is from when no person caused it.
 export const TRIGGER_SENDER = "OnePM";
 export const PULL_REQUEST_ACTION_TEXT = {

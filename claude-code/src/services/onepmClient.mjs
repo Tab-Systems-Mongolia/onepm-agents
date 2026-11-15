@@ -42,6 +42,12 @@ export const createOnepmClient = (baseUrl, apiKey, fetchImpl = fetch) => {
         method: "POST",
         body: JSON.stringify({ content }),
       }),
+    // Who may assign or mention the agent, from access.json.
+    reportAccess: (allowFrom) =>
+      request("/project-agent/access", {
+        method: "PUT",
+        body: JSON.stringify({ allowFrom }),
+      }),
     // Shows people the agent is writing a reply on the task.
     setBusy: (taskId, busy) =>
       request("/project-agent/busy", {

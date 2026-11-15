@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  borrowsOwner,
   isAllowedSender,
   isDeliverableKind,
   mentionsAgent,
@@ -164,6 +165,59 @@ describe("trigger events", () => {
         { ...trigger, kind: "comment", commentId: "c1" },
         access,
         self.id,
+      ),
+      false,
+    );
+  });
+});
+
+describe("borrowsOwner", () => {
+  const owner = "owner-1";
+
+  it("catches another agent named as the owner, old server or new", () => {
+    assert.equal(
+      borrowsOwner({ actorId: owner, actorSource: "agent" }, owner),
+      true,
+    );
+    assert.equal(
+      borrowsOwner(
+        { actorId: owner, actorSource: "agent", actorKind: "agent" },
+        owner,
+      ),
+      true,
+    );
+  });
+
+  it("leaves the owner in person, and anyone else, alone", () => {
+    assert.equal(
+      borrowsOwner({ actorId: owner, actorSource: "browser" }, owner),
+      false,
+    );
+    assert.equal(
+      borrowsOwner(
+        { actorId: owner, actorSource: "api_key", actorKind: "person" },
+        owner,
+      ),
+      false,
+    );
+    assert.equal(
+      borrowsOwner({ actorId: "agent-2", actorSource: "agent" }, owner),
+      false,
+    );
+    assert.equal(
+      borrowsOwner({ actorId: owner, actorSource: "agent" }, null),
+      false,
+    );
+  });
+
+  it("keeps the owner out when an agent borrows their place", () => {
+    const access = { allowFrom: [owner], requireMention: false };
+    assert.equal(
+      isAllowedSender(
+        { kind: "assignment", actorId: owner, actorSource: "agent" },
+        access,
+        self.id,
+        owner,
       ),
       false,
     );

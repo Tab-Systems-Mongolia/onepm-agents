@@ -48,6 +48,7 @@ import {
   createChannelTools,
   createIdleTools,
 } from "./src/services/channelTools.mjs";
+import { createAccessReporter } from "./src/services/accessReporter.mjs";
 import { createBusyTracker } from "./src/services/busyTracker.mjs";
 import { createTaskSlots } from "./src/services/taskSlots.mjs";
 import { createEventFeed } from "./src/services/eventFeed.mjs";
@@ -88,6 +89,8 @@ const client = idleReason
   : createOnepmClient(config.baseUrl, config.apiKey);
 // Shows people in OnePM that the agent is writing a reply on a task.
 const busy = client ? createBusyTracker({ client, log }) : null;
+// OnePM refuses assignments and mentions from anyone not on access.json.
+const access = client ? createAccessReporter({ client, log }) : null;
 // At most MAX_PARALLEL_TASKS tasks in hand at once; a further task's events
 // wait, unread, until one of them is answered or its hold runs out.
 const slots = createTaskSlots({
@@ -229,7 +232,14 @@ const start = async () => {
     retryTimer = setTimeout(start, SELF_RETRY_MS);
     return;
   }
-  const wake = () => void feed.drain();
+  // access.json is read again on every poll and event: a change made with
+  // /onepm:access reaches OnePM within POLL_MS.
+  const syncAccess = () => void access.sync(state.loadAccess());
+  syncAccess();
+  const wake = () => {
+    syncAccess();
+    void feed.drain();
+  };
   wakeFeed = wake;
   socket = connectAgentSocket({
     baseUrl: config.baseUrl,

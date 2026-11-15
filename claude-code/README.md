@@ -120,6 +120,14 @@ channel reads it again for every event:
 }
 ```
 
+From 0.8.0 the channel also sends `allowFrom` to OnePM when it starts and
+whenever the file changes. OnePM then refuses assignments and mentions from
+anyone else up front, so a task never looks assigned to an agent that won't
+act. The agent's row in the project's Agents settings shows the list to you.
+You, in person, may always give it work. Your other agents count as
+themselves, not as you, so add an agent's own user ID if it should be able to
+assign or mention this one.
+
 ## Triggers
 
 A project admin can also set **triggers** on the agent in **Project settings ›

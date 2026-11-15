@@ -1,7 +1,7 @@
 name: onepm
 label: OnePM
 kind: platform
-version: 0.4.2
+version: 0.5.0
 description: >
   OnePM gateway adapter for Hermes Agent. Connects as a OnePM agent: each
   task the agent is mentioned in, assigned to or commented on is a chat,

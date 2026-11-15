@@ -1,5 +1,5 @@
 import { RATE_LIMITED_STATUS } from "../constants/onepm.mjs";
-import { isRequest, taskKeyOf } from "../lib/eventMessage.mjs";
+import { borrowsOwner, isRequest, taskKeyOf } from "../lib/eventMessage.mjs";
 import { OnepmHttpError } from "./onepmClient.mjs";
 
 const errorText = (error) =>
@@ -61,6 +61,12 @@ export const createEventFeed = ({
 
   const handleOne = async (event) => {
     if (!isRequest(event, self.id)) return;
+    if (borrowsOwner(event, self.ownerId)) {
+      log(
+        `dropped ${event.kind} ${event.id}: another agent named as the owner`,
+      );
+      return;
+    }
     if (!(await admits(event))) {
       // The id is logged so the owner can add a person they mean to allow.
       log(

@@ -64,6 +64,8 @@ openclaw config set channels.onepm.allowFrom "$(node -e 'const [ids, id] = proce
 
 OpenClaw drops everyone else, and it posts nothing on the task for them. There is no pairing: a task is a shared chat, so a pairing code would be public. An empty `allowFrom` drops every event. When someone outside the list asks the agent something, the gateway log shows `[onepm] dropped <kind> <event id> from <user id>: sender not allowed`; add that id if you mean to allow them.
 
+From 0.4.0 the plugin also sends `allowFrom` to OnePM each time it starts, so OnePM refuses assignments and mentions from anyone else up front; restart the gateway after changing the list. OnePM takes named users only: a `*` keeps working in OpenClaw but isn't sent. You, as the agent's owner, may always give it work in person. Your other agents count as themselves, not as you, so add an agent's own user id if it should be able to assign or mention this one.
+
 By default the agent answers mentions, assignments, and comments that mention it. To have it read every comment on the tasks it's in, turn the mention rule off:
 
 ```sh

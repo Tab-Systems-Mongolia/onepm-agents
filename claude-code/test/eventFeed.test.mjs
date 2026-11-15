@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createEventFeed } from "../src/services/eventFeed.mjs";
 
-const self = { id: "agent-1", handle: "claudeagent", projectSlug: "onepm" };
+const self = {
+  id: "agent-1",
+  ownerId: "owner-1",
+  handle: "claudeagent",
+  projectSlug: "onepm",
+};
 const owner = { url: "https://pm.example.com", agentId: "agent-1" };
 
 const memoryState = (access, cursor = null) => {
@@ -135,6 +140,57 @@ describe("createEventFeed", () => {
     assert.equal(delivered.length, 0);
     assert.equal(state.cursor, 1);
     assert.equal(state.dropped[0].userId, "stranger");
+  });
+
+  // ONEPM-202: the owner's place on the list is for the owner in person.
+  it("drops another agent's event that an older server named as the owner", async () => {
+    const { delivered, state } = await run({
+      access: allowed,
+      events: [
+        event(1, {
+          kind: "assignment",
+          commentId: null,
+          actorId: "owner-1",
+          actorSource: "agent",
+        }),
+        event(2, {
+          kind: "assignment",
+          commentId: null,
+          actorId: "owner-1",
+          actorSource: "agent",
+          actorKind: "agent",
+        }),
+      ],
+    });
+    assert.equal(delivered.length, 0);
+    assert.equal(state.cursor, 2);
+  });
+
+  it("delivers the owner's own event, and another agent's only when listed", async () => {
+    const { delivered } = await run({
+      access: { allowFrom: ["owner-1", "agent-2"], requireMention: false },
+      events: [
+        event(1, { kind: "assignment", commentId: null, actorKind: "person" }),
+        event(2, {
+          kind: "assignment",
+          commentId: null,
+          actorId: "agent-2",
+          actorSource: "agent",
+          actorKind: "agent",
+        }),
+        event(3, {
+          kind: "assignment",
+          commentId: null,
+          actorId: "agent-3",
+          actorSource: "agent",
+          actorKind: "agent",
+        }),
+      ],
+    });
+    assert.deepEqual(
+      delivered.map(({ meta }) => meta.event_id),
+      ["e1", "e2"],
+    );
   });
 
   it("drops everything with an empty allowlist", async () => {

@@ -17,6 +17,11 @@ SOCKET_PATH = "/api/ws/agent"
 # worktrees, and the server leaves them out unless asked with include=release.
 REQUEST_KINDS = frozenset({"mention", "assignment", "comment", "status", "pull_request"})
 AGENT_ACTOR_SOURCE = "agent"
+# What the actor is (OnePM sets it): an agent is always named as itself.
+PERSON_ACTOR_KIND = "person"
+# OnePM refuses a wildcard in a reported allowlist: it takes named users only.
+WILDCARD = "*"
+TRUTHY_VALUES = ("1", "true", "yes", "on")
 # status and pull_request come from triggers a project admin set on tasks
 # assigned to the agent. OnePM sends them, not a person, so no allowlist
 # applies: they reach Hermes as from OnePM itself, vouched for by the adapter.

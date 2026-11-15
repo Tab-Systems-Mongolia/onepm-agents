@@ -32,8 +32,8 @@ from .constants import (
 )
 from .cursor import CursorStore, skip_history
 from .events import (
-    Inbound, chat_name, find_comment, is_agent_actor, is_request, is_trigger, needs_comment, needs_task,
-    task_key, to_inbound,
+    Inbound, allows_everyone, borrows_owner, chat_name, find_comment, is_agent_actor, is_request, is_trigger, needs_comment,
+    needs_task, reported_allow_from, task_key, to_inbound,
 )
 from .masking import mask_secrets
 from .project_sync import ProjectSync
@@ -49,8 +49,10 @@ PLATFORM_HINT = (
     "You are talking on OnePM, a project manager. Each chat is one OnePM task: the chat id is the "
     "task id and the chat name is the task key and title. Your replies are posted as comments on "
     "that task, which everyone on the project can read, so keep them focused and never include "
-    "secrets. Markdown is supported. If the OnePM MCP server is configured, use its tools to read "
-    "or update the task."
+    "secrets. Markdown is supported. To mention someone in a reply, write "
+    "<kaneo-mention id=\"<user id>\" label=\"<name>\">@<name></kaneo-mention>; the sender's id is the "
+    "message's user_id, others come from list_workspace_members. If the OnePM MCP server is "
+    "configured, use its tools to read or update the task."
 )
 
 
@@ -144,6 +146,7 @@ class OnepmAdapter(BasePlatformAdapter):
             self._release_platform_lock()
             await self._close_session()
             return self._fail("connect_failed", f"Couldn't read events: {error}", retryable=True)
+        await self._report_access()
         self._project_sync = ProjectSync(self._client, self._self_info, _clones(),
                                          _setting(WORKSPACE_IN_SANDBOX_ENV) or None)
         self._project_sync.start()
@@ -154,6 +157,18 @@ class OnepmAdapter(BasePlatformAdapter):
         logger.info("OnePM: connected to %s as @%s", self.base_url, self._self_info.get("handle"))
         self._wire_plugin_handlers(None)
         return True
+
+    async def _report_access(self) -> None:
+        """Tells OnePM who may assign or mention the agent, so it refuses everyone else up front. The
+        list comes from the environment, which only changes with a restart, so once per connect."""
+        if allows_everyone(_setting(ALLOW_ALL_ENV)):
+            logger.warning("OnePM: %s can't be passed to OnePM, which takes named users only; only %s "
+                           "and the owner can assign or mention the agent there", ALLOW_ALL_ENV, ALLOWED_USERS_ENV)
+        allow_from = reported_allow_from(_setting(ALLOWED_USERS_ENV), self._self_info.get("ownerId"))
+        try:
+            await self._client.report_access(allow_from)
+        except Exception as error:  # An older OnePM has no such route (404); nothing else depends on it.
+            logger.warning("OnePM: couldn't report who may reach the agent: %s", error)
 
     async def disconnect(self) -> None:
         with contextlib.suppress(Exception):
@@ -223,6 +238,9 @@ class OnepmAdapter(BasePlatformAdapter):
         actor_id = event.get("actorId")
         if not actor_id or is_trigger(event):
             return False
+        if borrows_owner(event, self._self_info.get("ownerId")):
+            logger.warning("OnePM: dropped an agent's event named as the owner (%s)", actor_id)
+            return True
         refused = sender_authorized(
             self, str(actor_id), "group", str(event["taskId"]), is_bot=is_agent_actor(event)) is False
         if refused:

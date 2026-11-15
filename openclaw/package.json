@@ -1,6 +1,6 @@
 {
   "name": "openclaw-channel-onepm",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "description": "OnePM channel for OpenClaw: a project agent's tasks as group chats",
   "license": "MIT",
