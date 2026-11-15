@@ -345,6 +345,22 @@ class AdapterTest(unittest.TestCase):
         asyncio.run(scenario())
         self.assertEqual(client.busy, [("task-1", True), ("task-1", False), ("task-1", True)])
 
+    def test_an_interim_comment_doesnt_end_busy_for_the_rest_of_the_turn(self):
+        client = self.adapter._client = _FakeClient([])
+        clock = [100.0]
+        self.adapter._now = lambda: clock[0]
+
+        async def scenario():
+            await self.adapter.send_typing("task-1")
+            await self.adapter.send("task-1", "on it")
+            clock[0] += 5.0
+            await self.adapter.send_typing("task-1")
+            clock[0] += 15.0
+            await self.adapter.send_typing("task-1")
+
+        asyncio.run(scenario())
+        self.assertEqual(client.busy, [("task-1", True), ("task-1", False), ("task-1", True)])
+
     def test_an_older_onepm_without_busy_is_left_alone(self):
         client = self.adapter._client = _FakeClient([])
         client.busy_error = OnepmError("POST", "/project-agent/busy", 404)

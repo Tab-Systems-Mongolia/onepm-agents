@@ -27,7 +27,7 @@ from .client import OnepmClient, OnepmError, is_not_found, is_rate_limited
 from .constants import (
     ALLOW_ALL_ENV, ALLOWED_USERS_ENV, BUSY_REFRESH_SECONDS, CURSOR_DIR, CURSOR_FILE, DEDUP_SIZE, DEDUP_TTL_SECONDS, DEFAULT_URL,
     DEFAULT_GIT_URL_TEMPLATE, DEFAULT_WORKSPACE_DIR, DISPLAY_TIER, DRAIN_RETRY_SECONDS, GIT_URL_TEMPLATE_ENV, HOME_CHANNEL_ENV, KEY_ENV,
-    MAX_COMMENT_LENGTH, NO_HOME_CHANNEL, PLATFORM_LABEL, PLATFORM_NAME, UNAUTHORIZED_STATUSES, URL_ENV, WORKSPACE_ENV,
+    MAX_COMMENT_LENGTH, NO_HOME_CHANNEL, PLATFORM_LABEL, PLATFORM_NAME, REPLY_GRACE_SECONDS, UNAUTHORIZED_STATUSES, URL_ENV, WORKSPACE_ENV,
     STAGING_DIR, WORKSPACE_IN_SANDBOX_ENV,
 )
 from .cursor import CursorStore, skip_history
@@ -99,7 +99,9 @@ class OnepmAdapter(BasePlatformAdapter):
         # Typing shows the agent "replying" on the task in OnePM: when each
         # chat was last marked, and the chats already answered this turn.
         self._busy_marked: Dict[str, float] = {}
-        self._replied: set[str] = set()
+        # When each task last got a comment: a refresh already on its way then
+        # mustn't bring "replying" back right after the answer lands.
+        self._replied_at: Dict[str, float] = {}
         self._busy_supported = True
         self._now = time.monotonic
         # The project summary and repository clones; set up once connected.
@@ -292,9 +294,10 @@ class OnepmAdapter(BasePlatformAdapter):
         except (aiohttp.ClientError, asyncio.TimeoutError) as error:
             return SendResult(success=False, error=str(error), retryable=True)
         comment_id = comment.get("id") if isinstance(comment, dict) else None
-        # OnePM ends "replying" when the comment lands; a refresh already on
-        # its way could bring it back, so say so too.
-        self._replied.add(chat_id)
+        # OnePM ends "replying" when the comment lands; say so too. An interim
+        # comment doesn't end the turn, so typing marks it busy again after
+        # REPLY_GRACE_SECONDS.
+        self._replied_at[chat_id] = self._now()
         if self._busy_marked.pop(chat_id, None) is not None:
             await self._set_busy(chat_id, False)
         return SendResult(success=True, message_id=str(comment_id) if comment_id else None)
@@ -316,10 +319,13 @@ class OnepmAdapter(BasePlatformAdapter):
 
     async def send_typing(self, chat_id: str, metadata=None) -> None:
         """Shows the agent replying on the task, refreshed every BUSY_REFRESH_SECONDS."""
-        if chat_id == NO_HOME_CHANNEL or chat_id in self._replied:
+        if chat_id == NO_HOME_CHANNEL:
+            return
+        now = self._now()
+        replied = self._replied_at.get(chat_id)
+        if replied is not None and now - replied < REPLY_GRACE_SECONDS:
             return
         last = self._busy_marked.get(chat_id)
-        now = self._now()
         if last is not None and now - last < BUSY_REFRESH_SECONDS:
             return
         self._busy_marked[chat_id] = now
@@ -327,7 +333,7 @@ class OnepmAdapter(BasePlatformAdapter):
 
     async def stop_typing(self, chat_id: str) -> None:
         """The turn ended: no longer replying there."""
-        self._replied.discard(chat_id)
+        self._replied_at.pop(chat_id, None)
         if self._busy_marked.pop(chat_id, None) is not None:
             await self._set_busy(chat_id, False)
 

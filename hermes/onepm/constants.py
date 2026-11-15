@@ -60,6 +60,8 @@ NOT_FOUND_STATUS = 404
 # Hermes refreshes typing every couple of seconds; OnePM keeps an agent
 # "replying" for 30 seconds after the last call, so this is often enough.
 BUSY_REFRESH_SECONDS = 15.0
+# After a comment, typing marks the task busy again only once this has passed.
+REPLY_GRACE_SECONDS = 15.0
 UNAUTHORIZED_STATUSES = frozenset({401, 403})
 
 # createCommentBody caps content at 10,000 characters.
