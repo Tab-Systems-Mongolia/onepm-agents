@@ -91,15 +91,19 @@ Make sure the agent's commands run in Docker, whatever the cloned profile used. 
 hermes --profile devbot config set terminal.backend docker
 ```
 
-Then add one line to `terminal.docker_volumes` in `~/.hermes/profiles/devbot/config.yaml`, next to the mounts already there:
+Then add one line to `terminal.docker_volumes` in `~/.hermes/profiles/devbot/config.yaml`, next to the mounts already there. Docker needs the full host path, which this prints:
+
+```bash
+echo "    - \"$HOME/.hermes/profiles/devbot/onepm/repos:/workspace/repos\""
+```
 
 ```yaml
 terminal:
   docker_volumes:
-    - "${ONEPM_WORKSPACE}:/workspace/repos"
+    - "/home/hermes/.hermes/profiles/devbot/onepm/repos:/workspace/repos"
 ```
 
-Hermes fills in `${ONEPM_WORKSPACE}` from the profile's `.env`. Edit the list rather than using `hermes config set terminal.docker_volumes`, which replaces the whole list, and with it whatever your own setup mounts. Mount only the workspace: never `~/.hermes/profiles/devbot/onepm` or its `staging` folder.
+Don't write `${ONEPM_WORKSPACE}` there: a gateway that serves several profiles (Hermes 0.23 and later) doesn't load the profile's `.env`, so Docker gets the text as it stands and every sandbox command fails with exit status 125. Edit the list rather than using `hermes config set terminal.docker_volumes`, which replaces the whole list, and with it whatever your own setup mounts. Mount only the workspace: never `~/.hermes/profiles/devbot/onepm` or its `staging` folder.
 
 Git access in the sandbox is whatever you already set up: a cloned profile keeps the default profile's `terminal` settings, such as a mounted SSH key or a token. The gateway clones on the host with this server user's own SSH key (`ssh -T git@github.com` should greet you), and the clones' `origin` is `git@github.com:<owner>/<repo>.git`, so pushing from the sandbox needs SSH there too. For HTTPS, set `ONEPM_GIT_URL_TEMPLATE`. If the sandbox has no git access yet, see [An ssh-agent for the sandbox](#an-ssh-agent-for-the-sandbox).
 
