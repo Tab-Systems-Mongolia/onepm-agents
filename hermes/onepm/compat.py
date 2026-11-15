@@ -22,6 +22,17 @@ except ImportError:
     from gateway.platforms.base import MessageEvent, MessageType
 
 try:
+    from gateway.platform_registry import PlatformEntry as _PlatformEntry
+    _ENTRY_FIELDS = set(getattr(_PlatformEntry, "__dataclass_fields__", {}))
+except ImportError:
+    _ENTRY_FIELDS = set()
+
+
+def display_kwargs(tier: str) -> dict:
+    """``display_tier`` for ``register_platform``, left out where Hermes doesn't know it yet."""
+    return {"display_tier": tier} if "display_tier" in _ENTRY_FIELDS else {}
+
+try:
     from gateway.platforms.helpers import cancel_task
 except ImportError:
     async def cancel_task(task: Optional[asyncio.Task]) -> None:

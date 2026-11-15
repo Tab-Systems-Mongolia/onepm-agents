@@ -22,11 +22,11 @@ from gateway.config import Platform
 from gateway.platforms.base import BasePlatformAdapter, SendResult
 from gateway.platforms.helpers import MessageDeduplicator
 
-from .compat import MessageEvent, MessageType, cancel_task, get_scoped_secret, sender_authorized
+from .compat import MessageEvent, MessageType, cancel_task, display_kwargs, get_scoped_secret, sender_authorized
 from .client import OnepmClient, OnepmError, is_not_found, is_rate_limited
 from .constants import (
     ALLOW_ALL_ENV, ALLOWED_USERS_ENV, BUSY_REFRESH_SECONDS, CURSOR_DIR, CURSOR_FILE, DEDUP_SIZE, DEDUP_TTL_SECONDS, DEFAULT_URL,
-    DEFAULT_GIT_URL_TEMPLATE, DEFAULT_WORKSPACE_DIR, DRAIN_RETRY_SECONDS, GIT_URL_TEMPLATE_ENV, HOME_CHANNEL_ENV, KEY_ENV,
+    DEFAULT_GIT_URL_TEMPLATE, DEFAULT_WORKSPACE_DIR, DISPLAY_TIER, DRAIN_RETRY_SECONDS, GIT_URL_TEMPLATE_ENV, HOME_CHANNEL_ENV, KEY_ENV,
     MAX_COMMENT_LENGTH, NO_HOME_CHANNEL, PLATFORM_LABEL, PLATFORM_NAME, UNAUTHORIZED_STATUSES, URL_ENV, WORKSPACE_ENV,
     STAGING_DIR, WORKSPACE_IN_SANDBOX_ENV,
 )
@@ -378,4 +378,5 @@ def register(ctx):
         max_message_length=MAX_COMMENT_LENGTH,
         emoji="📋",
         platform_hint=PLATFORM_HINT,
+        **display_kwargs(DISPLAY_TIER),
     )

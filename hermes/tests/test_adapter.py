@@ -109,6 +109,11 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(self.adapter.platform, Platform("onepm"))
         self.assertEqual(self.adapter.base_url, "https://pm.example.com")
 
+    def test_registers_the_quiet_display_tier(self):
+        entry = platform_registry.get("onepm")
+        if "display_tier" in getattr(PlatformEntry, "__dataclass_fields__", {}):
+            self.assertEqual(entry.display_tier, "low")
+
     def test_url_defaults_to_the_hosted_onepm(self):
         os.environ.pop("ONEPM_URL", None)
         adapter = onepm_adapter.OnepmAdapter(PlatformConfig(enabled=True))

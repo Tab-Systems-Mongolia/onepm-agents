@@ -2,6 +2,9 @@
 
 PLATFORM_NAME = "onepm"
 PLATFORM_LABEL = "OnePM"
+# Every message is a task comment the whole workspace reads and Hermes can't
+# edit, so progress, interim and "still working" notes stay off by default.
+DISPLAY_TIER = "low"
 
 URL_ENV = "ONEPM_URL"
 # The hosted OnePM. ONEPM_URL is only needed for a self-hosted instance.

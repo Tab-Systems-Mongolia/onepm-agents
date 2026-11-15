@@ -116,6 +116,14 @@ loginctl show-user "$USER" --property=Linger
 
 How the gateway runs depends on the host:
 
+- **Progress notes stay off.** Every message is a task comment the whole workspace reads and can't be edited, so from plugin 0.5.1 the OnePM platform uses Hermes's `low` display tier: no tool progress, interim or "still working" comments, only the answer. A value set directly under `display` in the profile's `config.yaml` (such as `tool_progress: all`, which `hermes setup` writes) still wins over the tier, so turn them off for OnePM alone:
+
+  ```bash
+  hermes --profile devbot config set display.platforms.onepm.tool_progress off
+  hermes --profile devbot config set display.platforms.onepm.interim_assistant_messages false
+  hermes --profile devbot config set display.platforms.onepm.long_running_notifications false
+  hermes --profile devbot config set display.platforms.onepm.busy_ack_detail false
+  ```
 - **One gateway for every profile (Hermes 0.23 and later).** `hermes update` can switch a host to multiplex mode: it sets `gateway.multiplex_profiles: true` in `~/.hermes/config.yaml` and removes the per-profile `systemd` units. The default profile's gateway (`hermes-gateway`) then picks up a new profile by itself within 30 seconds, and refuses a separate `gateway install` for it. The block above only lists the profiles, so you can see `devbot` served by that gateway. Its log is `journalctl --user -u hermes-gateway -f`. To fold an existing per-profile host onto one gateway, run `hermes gateway migrate --multiplex` (`--dry-run` shows the plan first).
 - **One gateway per profile (older Hermes, or a host that hasn't switched).** Hermes writes and starts the profile's own `systemd --user` unit, `hermes-gateway-devbot`. Its log is `journalctl --user -u hermes-gateway-devbot -f`.
 
