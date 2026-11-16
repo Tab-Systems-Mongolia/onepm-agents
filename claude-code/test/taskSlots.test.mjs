@@ -17,6 +17,16 @@ describe("createTaskSlots", () => {
     assert.equal(slots.size(), 2);
   });
 
+  it("lets trigger notices through without taking a slot", () => {
+    const slots = createTaskSlots({ max: 1, holdMs: 1000, now: () => 0 });
+    slots.start("t1");
+    assert.equal(slots.admits("t2", "status"), true);
+    slots.start("t2", "status");
+    slots.start("t3", "pull_request");
+    assert.equal(slots.size(), 1);
+    assert.equal(slots.admits("t4", "assignment"), false);
+  });
+
   it("always admits more messages for a task already being worked on", () => {
     const slots = createTaskSlots({ max: 1, holdMs: 1000, now: () => 0 });
     slots.start("t1");

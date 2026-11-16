@@ -37,6 +37,7 @@ import {
   REMOTE_RETRY_MS,
   SELF_RETRY_MS,
   TASK_SLOT_HOLD_MS,
+  TRIGGER_KINDS,
 } from "./src/constants/onepm.mjs";
 import { resolveConfig } from "./src/lib/config.mjs";
 import { errorMessage } from "./src/lib/errorMessage.mjs";
@@ -217,10 +218,11 @@ const start = async () => {
         method: CHANNEL_METHOD,
         params: { content, meta },
       });
-      busy.start(meta.chat_id);
-      slots.start(meta.chat_id);
+      // A trigger notice asks for nothing, so it shows no busy mark either.
+      if (!TRIGGER_KINDS.includes(meta.kind)) busy.start(meta.chat_id);
+      slots.start(meta.chat_id, meta.kind);
     },
-    admits: (event) => slots.admits(event.taskId),
+    admits: (event) => slots.admits(event.taskId, event.kind),
     log,
   });
   try {
