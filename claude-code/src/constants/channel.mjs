@@ -1,7 +1,7 @@
 // The Claude Code channel contract and what the server tells Claude.
 
 export const SERVER_NAME = "onepm";
-export const SERVER_VERSION = "0.8.0";
+export const SERVER_VERSION = "0.8.3";
 export const LOG_PREFIX = "onepm channel:";
 
 export const CHANNEL_CAPABILITY = "claude/channel";

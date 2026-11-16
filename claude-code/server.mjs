@@ -41,6 +41,7 @@ import {
 } from "./src/constants/onepm.mjs";
 import { resolveConfig } from "./src/lib/config.mjs";
 import { errorMessage } from "./src/lib/errorMessage.mjs";
+import { idleNotice, listProfiles } from "./src/lib/idleNotice.mjs";
 import { maskSecrets } from "./src/lib/maskSecrets.mjs";
 import { resolveProfile, unconfiguredMessage } from "./src/lib/profile.mjs";
 import { connectAgentSocket } from "./src/services/agentSocket.mjs";
@@ -261,7 +262,21 @@ const start = async () => {
 // events start flowing once it has.
 mcp.oninitialized = () => {
   initialized = true;
-  if (!idleReason) void start();
+  if (!idleReason) {
+    void start();
+    return;
+  }
+  // Say once why nothing arrives (ONEPM-221): only a session started with
+  // the channel flag shows it, so ordinary sessions stay quiet.
+  void mcp
+    .notification({
+      method: CHANNEL_METHOD,
+      params: {
+        content: idleNotice(idleReason, listProfiles(homedir())),
+        meta: { chat_id: "", user: "OnePM", kind: "setup" },
+      },
+    })
+    .catch(() => {});
 };
 
 await mcp.connect(new StdioServerTransport());
