@@ -29,13 +29,17 @@ describe("createIdleTools", () => {
 describe("reply", () => {
   const setup = (postComment) => {
     const stopped = [];
+    const working = [];
     const tools = createChannelTools({
       client: { postComment },
       apiKey: "opm_agent_secret",
       getSelf: () => null,
-      busy: { stop: (taskId) => stopped.push(taskId) },
+      busy: {
+        stop: (taskId) => stopped.push(taskId),
+        work: (taskId) => working.push(taskId),
+      },
     });
-    return { tools, stopped };
+    return { tools, stopped, working };
   };
 
   it("stops being busy on the task once the reply is posted", async () => {
@@ -45,6 +49,36 @@ describe("reply", () => {
 
     assert.equal(result.isError, undefined);
     assert.deepEqual(stopped, ["t1"]);
+  });
+
+  it("keeps the task busy after a reply sent with working: true", async () => {
+    const { tools, stopped, working } = setup(async () => ({}));
+
+    const result = await tools.call("reply", {
+      chat_id: "t1",
+      text: "got it, starting",
+      working: true,
+    });
+
+    assert.equal(result.isError, undefined);
+    assert.deepEqual(working, ["t1"]);
+    assert.deepEqual(stopped, []);
+  });
+
+  it("set_working marks and clears a task without a comment", async () => {
+    let commented = false;
+    const { tools, stopped, working } = setup(async () => {
+      commented = true;
+    });
+
+    await tools.call("set_working", { chat_id: "t1", working: true });
+    await tools.call("set_working", { chat_id: "t1", working: false });
+    const missing = await tools.call("set_working", { chat_id: "t1" });
+
+    assert.deepEqual(working, ["t1"]);
+    assert.deepEqual(stopped, ["t1"]);
+    assert.equal(missing.isError, true);
+    assert.equal(commented, false);
   });
 
   it("stays busy when the reply couldn't be posted", async () => {

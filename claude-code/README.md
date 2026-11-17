@@ -153,6 +153,13 @@ see when Claude's turn ends, so it refreshes the mark every 15 seconds for at
 most 10 minutes; a turn that ends without a reply clears 30 seconds after the
 last refresh. An older OnePM without this feature is left alone.
 
+From 0.8.4 the mark can last as long as the work. A reply sent with
+`working: true` (an acknowledgement or a progress note) keeps the task busy,
+and `set_working(chat_id, true)` marks a task the agent works on without a
+message from it, such as work started from the terminal. Either one refreshes
+for up to 2 hours; the final reply, or `set_working(chat_id, false)`, clears
+it, and it clears by itself 30 seconds after the session ends.
+
 ## Several tasks at once
 
 From 0.6.0, one session works on up to 5 tasks at once. The channel delivers
@@ -193,7 +200,8 @@ same profile takes over, and the first one stops receiving events.
 
 | Tool | What it does |
 | --- | --- |
-| `reply(chat_id, text)` | Posts `text` (Markdown) as a comment on the task. Token-like secrets are masked first. Replies over 10,000 characters are split into several comments. |
+| `reply(chat_id, text, working?)` | Posts `text` (Markdown) as a comment on the task. Token-like secrets are masked first. Replies over 10,000 characters are split into several comments. With `working: true` the task stays busy. |
+| `set_working(chat_id, working)` | Shows or clears the busy mark on a task without posting. |
 | `get_task(chat_id)` | Returns the task's title, description, status, priority, and its last 20 comments. |
 
 ### OnePM's tools come with the plugin

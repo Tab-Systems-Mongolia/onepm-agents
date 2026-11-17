@@ -96,6 +96,30 @@ describe("createBusyTracker", () => {
     assert.equal(timers.count(), 0);
   });
 
+  it("keeps refreshing longer work until its own cap", async () => {
+    const client = recordingClient();
+    const timers = manualTimers();
+    let now = 0;
+    const busy = createBusyTracker({
+      client,
+      log: () => {},
+      timers,
+      now: () => now,
+      maxMs: 60_000,
+    });
+
+    busy.start("t1", 600_000);
+    await settle();
+    now = 300_000;
+    await timers.tick();
+    assert.deepEqual(client.calls.at(-1), ["t1", true]);
+
+    now = 600_000;
+    await timers.tick();
+    assert.deepEqual(client.calls.at(-1), ["t1", false]);
+    assert.equal(timers.count(), 0);
+  });
+
   it("goes quiet on a server without the busy route", async () => {
     const client = recordingClient(
       new OnepmHttpError("POST", "/project-agent/busy", 404),

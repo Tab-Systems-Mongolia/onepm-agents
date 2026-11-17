@@ -8,6 +8,8 @@ const systemTimers = { setInterval, clearInterval };
 // until its reply is posted. A channel server can't see when Claude's turn
 // ends, so it refreshes the busy mark while it waits, up to maxMs; a turn
 // that ends without a reply clears by itself once the refreshing stops.
+// start(taskId, capMs) lets work the agent says goes on (a working reply,
+// set_working) refresh for longer than an unanswered event.
 export const createBusyTracker = ({
   client,
   log,
@@ -19,6 +21,8 @@ export const createBusyTracker = ({
   const refreshing = new Map();
   // When each task's latest event arrived: a new one waits the full time.
   const startedAt = new Map();
+  // How long each task refreshes from startedAt.
+  const capOf = new Map();
   // An older OnePM has no busy route; then nothing is sent again.
   let supported = true;
 
@@ -42,16 +46,21 @@ export const createBusyTracker = ({
     if (timer !== undefined) timers.clearInterval(timer);
     refreshing.delete(taskId);
     startedAt.delete(taskId);
+    capOf.delete(taskId);
     send(taskId, false);
   };
 
-  const start = (taskId) => {
+  const start = (taskId, capMs = maxMs) => {
     if (!supported) return;
     send(taskId, true);
     startedAt.set(taskId, now());
+    capOf.set(taskId, capMs);
     if (refreshing.has(taskId)) return;
     const timer = timers.setInterval(() => {
-      if (now() - (startedAt.get(taskId) ?? 0) >= maxMs) {
+      if (
+        now() - (startedAt.get(taskId) ?? 0) >=
+        (capOf.get(taskId) ?? maxMs)
+      ) {
         stop(taskId);
         return;
       }

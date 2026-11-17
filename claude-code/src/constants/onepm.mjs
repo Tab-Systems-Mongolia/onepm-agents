@@ -53,6 +53,9 @@ export const NOT_FOUND_STATUS = 404;
 // more often than that, until the reply is posted or a turn has surely ended.
 export const BUSY_REFRESH_MS = 15_000;
 export const BUSY_MAX_MS = 600_000;
+// How long a task the agent says it works on stays busy without a new
+// event or set_working call: long work, but a mark never outlives it for good.
+export const BUSY_WORKING_MAX_MS = 7_200_000;
 // Tasks the session works on at once, each with its own subagent and worktree.
 export const MAX_PARALLEL_TASKS = 5;
 // A task without a reply gives up its slot after this long.

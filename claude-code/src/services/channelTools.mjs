@@ -1,4 +1,8 @@
-import { GET_TASK_TOOL, REPLY_TOOL } from "../constants/channel.mjs";
+import {
+  GET_TASK_TOOL,
+  REPLY_TOOL,
+  SET_WORKING_TOOL,
+} from "../constants/channel.mjs";
 import { COMMENT_MAX_LENGTH, RECENT_COMMENTS } from "../constants/onepm.mjs";
 import { formatTask, splitReply, taskKeyOf } from "../lib/eventMessage.mjs";
 import { maskSecrets } from "../lib/maskSecrets.mjs";
@@ -17,6 +21,11 @@ export const TOOL_DEFINITIONS = [
           description: "The task id from the inbound message.",
         },
         text: { type: "string", description: "The comment, in Markdown." },
+        working: {
+          type: "boolean",
+          description:
+            "True when you keep working on the task after this reply (an acknowledgement or progress note): the busy mark stays. Leave it out for the final reply, which clears the mark.",
+        },
       },
       required: ["chat_id", "text"],
     },
@@ -34,6 +43,26 @@ export const TOOL_DEFINITIONS = [
         },
       },
       required: ["chat_id"],
+    },
+  },
+  {
+    name: SET_WORKING_TOOL,
+    description:
+      "Show or clear the busy mark people see on a OnePM task while you work on it, without posting a comment. Use it for work that didn't start from a channel message, such as a task the user asked for in the terminal. The mark refreshes while this session runs, for up to 2 hours, and clears when the session ends.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        chat_id: {
+          type: "string",
+          description:
+            "The task's id (chat_id of a message, or the id a OnePM tool returns).",
+        },
+        working: {
+          type: "boolean",
+          description: "True while you work on it, false when you finish.",
+        },
+      },
+      required: ["chat_id", "working"],
     },
   },
 ];
@@ -70,8 +99,19 @@ export const createChannelTools = ({ client, apiKey, getSelf, busy }) => {
       }
       throw error;
     }
-    busy?.stop(chatId);
+    if (args.working === true) busy?.work(chatId);
+    else busy?.stop(chatId);
     return textResult(posted === 1 ? "posted" : `posted as ${posted} comments`);
+  };
+
+  const setWorking = async (args) => {
+    const chatId = requiredString(args, "chat_id");
+    if (typeof args.working !== "boolean")
+      throw new Error("working must be true or false");
+    if (!busy) return textResult("this OnePM can't show a busy mark", true);
+    if (args.working) busy.work(chatId);
+    else busy.stop(chatId);
+    return textResult(args.working ? "marked busy" : "busy mark cleared");
   };
 
   const getTask = async (args) => {
@@ -92,7 +132,11 @@ export const createChannelTools = ({ client, apiKey, getSelf, busy }) => {
     );
   };
 
-  const handlers = { [REPLY_TOOL]: reply, [GET_TASK_TOOL]: getTask };
+  const handlers = {
+    [REPLY_TOOL]: reply,
+    [GET_TASK_TOOL]: getTask,
+    [SET_WORKING_TOOL]: setWorking,
+  };
 
   return {
     call: async (name, args) => {

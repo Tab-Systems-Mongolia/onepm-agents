@@ -30,6 +30,7 @@ import {
   SERVER_VERSION,
 } from "./src/constants/channel.mjs";
 import {
+  BUSY_WORKING_MAX_MS,
   MAX_PARALLEL_TASKS,
   POLL_MS,
   PROJECT_CONTEXT_TIMEOUT_MS,
@@ -100,11 +101,17 @@ const slots = createTaskSlots({
   holdMs: TASK_SLOT_HOLD_MS,
 });
 let wakeFeed = () => {};
-// A posted reply ends the busy mark and frees the task's slot.
+// A posted reply frees the task's slot. A final one ends the busy mark; one
+// the agent keeps working after (working: true) keeps it, for longer.
 const replied = busy
   ? {
       stop: (taskId) => {
         busy.stop(taskId);
+        slots.finish(taskId);
+        wakeFeed();
+      },
+      work: (taskId) => {
+        busy.start(taskId, BUSY_WORKING_MAX_MS);
         slots.finish(taskId);
         wakeFeed();
       },
