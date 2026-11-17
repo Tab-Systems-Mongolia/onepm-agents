@@ -1,10 +1,27 @@
 import {
   AGENT_ACTOR_SOURCE,
+  ASSISTANT_ACTOR_KIND,
+  ASSISTANT_VIA,
   EVENT_KINDS,
   PERSON_ACTOR_KIND,
   TRIGGER_KINDS,
   TRIGGER_SOURCE,
 } from "../constants/onepm.mjs";
+
+// OnePM Assistant acting for a person reaches the agent as that person's
+// request, marked `via` the Assistant: the allowlist checks the person, and
+// the agent knows an AI wrote the text. Every other event is unchanged.
+export const asSenderView = (event) => {
+  const behalf = event.onBehalfOf;
+  if (event.actorKind !== ASSISTANT_ACTOR_KIND || !behalf?.id) return event;
+  return {
+    ...event,
+    actorId: behalf.id,
+    actorName: behalf.name ?? null,
+    actorKind: PERSON_ACTOR_KIND,
+    via: ASSISTANT_VIA,
+  };
+};
 
 const DEFAULT_ACCESS = { allowFrom: [], requireMention: true };
 

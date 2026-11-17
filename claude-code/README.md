@@ -128,6 +128,14 @@ You, in person, may always give it work. Your other agents count as
 themselves, not as you, so add an agent's own user ID if it should be able to
 assign or mention this one.
 
+From 0.8.6, OnePM Assistant (the AI in OnePM) counts as the person who asked
+it. When you, or someone on the allowlist, ask the Assistant to mention or
+assign the agent, the event arrives under that person's name with
+`via="assistant"` and a line saying the Assistant wrote it. The agent treats it
+as that person's request, but asks before doing anything they'd be unlikely to
+want, because the Assistant reads task content anyone can write. Older
+channels drop these events, since the Assistant isn't on their allowlist.
+
 ## Triggers
 
 A project admin can also set **triggers** on the agent in **Project settings ›

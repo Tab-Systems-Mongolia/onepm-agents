@@ -1,4 +1,5 @@
 import {
+  ASSISTANT_VIA,
   EVENT_KINDS,
   PULL_REQUEST_ACTION_TEXT,
   TRIGGER_SENDER,
@@ -93,12 +94,19 @@ export const formatEvent = (event, details) => {
     [details.taskKey && `[${details.taskKey}]`, details.taskTitle]
       .filter(Boolean)
       .join(" ") || `Task ${event.taskId}`;
-  const content = [task, ...linesOf(event, details, who)].join("\n");
+  const content = [
+    task,
+    ...(event.via === ASSISTANT_VIA
+      ? [`(Written by OnePM Assistant for ${who}, not typed by them.)`]
+      : []),
+    ...linesOf(event, details, who),
+  ].join("\n");
   const meta = {
     chat_id: event.taskId,
     user: who,
     user_id: event.actorId ?? "",
     kind: event.kind,
+    via: event.via ?? "",
     task_key: details.taskKey ?? "",
     event_id: event.id,
     ...(event.createdAt ? { ts: String(event.createdAt) } : {}),

@@ -1,4 +1,5 @@
 import {
+  asSenderView,
   isAllowedSender,
   isDeliverableKind,
   passesMentionRule,
@@ -64,8 +65,9 @@ export const createEventFeed = ({
     );
   };
 
-  const handle = async (event) => {
-    if (!isDeliverableKind(event.kind)) return;
+  const handle = async (received) => {
+    if (!isDeliverableKind(received.kind)) return;
+    const event = asSenderView(received);
     // Read for every event, so access changes apply at once.
     const access = state.loadAccess();
     if (!isAllowedSender(event, access, self.id, self.ownerId)) {

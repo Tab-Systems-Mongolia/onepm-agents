@@ -83,6 +83,10 @@ export const TRIGGER_SOURCE = "trigger";
 // actor and sets actorKind; older servers named its owner instead.
 export const AGENT_ACTOR_SOURCE = "agent";
 export const PERSON_ACTOR_KIND = "person";
+// OnePM Assistant, acting for the person who started its run.
+export const ASSISTANT_ACTOR_KIND = "assistant";
+// The channel's `via` for text OnePM Assistant wrote for its sender.
+export const ASSISTANT_VIA = "assistant";
 // What OnePM refuses in a reported allowlist: it takes named users only.
 export const WILDCARD = "*";
 // Who a trigger message is from when no person caused it.
