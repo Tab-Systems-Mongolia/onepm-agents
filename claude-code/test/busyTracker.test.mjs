@@ -120,6 +120,29 @@ describe("createBusyTracker", () => {
     assert.equal(timers.count(), 0);
   });
 
+  it("a shorter start doesn't cut longer work short", async () => {
+    const client = recordingClient();
+    const timers = manualTimers();
+    let now = 0;
+    const busy = createBusyTracker({
+      client,
+      log: () => {},
+      timers,
+      now: () => now,
+      maxMs: 60_000,
+    });
+
+    busy.start("t1", 600_000);
+    now = 10_000;
+    // A new event on the task the agent already works on.
+    busy.start("t1", 60_000);
+    await settle();
+    now = 300_000;
+    await timers.tick();
+
+    assert.deepEqual(client.calls.at(-1), ["t1", true]);
+  });
+
   it("goes quiet on a server without the busy route", async () => {
     const client = recordingClient(
       new OnepmHttpError("POST", "/project-agent/busy", 404),

@@ -30,6 +30,7 @@ import {
   SERVER_VERSION,
 } from "./src/constants/channel.mjs";
 import {
+  BUSY_DELIVERY_MAX_MS,
   BUSY_WORKING_MAX_MS,
   MAX_PARALLEL_TASKS,
   POLL_MS,
@@ -61,6 +62,7 @@ import { loadProjectContext } from "./src/services/projectContext.mjs";
 import { connectRemoteMcp } from "./src/services/remoteMcpClient.mjs";
 import { createRemoteTools } from "./src/services/remoteTools.mjs";
 import { createStateFiles } from "./src/services/stateFiles.mjs";
+import { createStatusBusy } from "./src/services/statusBusy.mjs";
 import { createToolRouter } from "./src/services/toolRouter.mjs";
 
 // Never let the key reach stderr, which Claude Code may show or log.
@@ -174,6 +176,15 @@ mcp = new Server(
   },
 );
 
+// Moving a task to a status marks it busy, or clears the mark when the status
+// is final, so the agent needn't remember set_working.
+const statusBusy = busy
+  ? createStatusBusy({
+      busy,
+      finalStatuses: () => context?.finalStatuses ?? null,
+    })
+  : null;
+
 const tools = createToolRouter({
   definitions: TOOL_DEFINITIONS,
   local: idleReason
@@ -185,6 +196,8 @@ const tools = createToolRouter({
         busy: replied,
       }),
   remote,
+  onRemoteResult: (name, args, result) =>
+    statusBusy?.observe(name, args, result),
 });
 mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: await tools.list(),
@@ -227,7 +240,8 @@ const start = async () => {
         params: { content, meta },
       });
       // A trigger notice asks for nothing, so it shows no busy mark either.
-      if (!TRIGGER_KINDS.includes(meta.kind)) busy.start(meta.chat_id);
+      if (!TRIGGER_KINDS.includes(meta.kind))
+        busy.start(meta.chat_id, BUSY_DELIVERY_MAX_MS);
       slots.start(meta.chat_id, meta.kind);
     },
     admits: (event) => slots.admits(event.taskId, event.kind),

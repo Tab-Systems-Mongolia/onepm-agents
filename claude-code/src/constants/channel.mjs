@@ -1,7 +1,7 @@
 // The Claude Code channel contract and what the server tells Claude.
 
 export const SERVER_NAME = "onepm";
-export const SERVER_VERSION = "0.8.4";
+export const SERVER_VERSION = "0.8.5";
 export const LOG_PREFIX = "onepm channel:";
 
 export const CHANNEL_CAPABILITY = "claude/channel";
@@ -10,6 +10,8 @@ export const CHANNEL_METHOD = "notifications/claude/channel";
 export const REPLY_TOOL = "reply";
 export const GET_TASK_TOOL = "get_task";
 export const SET_WORKING_TOOL = "set_working";
+// OnePM tools that move a task to a status: { taskId, status }.
+export const STATUS_TOOL_NAMES = ["update_task_status", "update_task"];
 
 export const START_COMMAND =
   "ONEPM_AGENT=<name> claude --dangerously-load-development-channels plugin:onepm@onepm";

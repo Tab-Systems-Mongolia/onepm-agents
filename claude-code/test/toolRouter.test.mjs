@@ -57,6 +57,24 @@ describe("createToolRouter", () => {
     assert.equal(result.content[0].text, "remote update_task");
   });
 
+  it("shows each OnePM call and its result", async () => {
+    const seen = [];
+    const router = createToolRouter({
+      definitions,
+      local,
+      remote,
+      onRemoteResult: (name, args, result) =>
+        seen.push([name, args, result?.content[0].text]),
+    });
+
+    await router.call("update_task", { taskId: "t1" });
+    await router.call("reply", {});
+
+    assert.deepEqual(seen, [
+      ["update_task", { taskId: "t1" }, "remote update_task"],
+    ]);
+  });
+
   it("refuses a name neither knows", async () => {
     const router = createToolRouter({ definitions, local, remote });
 

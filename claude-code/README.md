@@ -160,6 +160,15 @@ message from it, such as work started from the terminal. Either one refreshes
 for up to 2 hours; the final reply, or `set_working(chat_id, false)`, clears
 it, and it clears by itself 30 seconds after the session ends.
 
+From 0.8.5 the mark follows what the agent does. A delivered event marks its
+task for 2 minutes instead of 10, so an event the agent doesn't answer (a
+hand-over, a mention that needs nothing) clears soon. Moving a task with
+`update_task_status` or `update_task` to a status that isn't final marks it
+busy for up to 2 hours, as `set_working(chat_id, true)` would; moving it to a
+final status clears the mark. A shorter mark never cuts a longer one short.
+OnePM also clears every agent's mark on a task once it reaches a final
+column, whichever plugin version the agent runs.
+
 ## Several tasks at once
 
 From 0.6.0, one session works on up to 5 tasks at once. The channel delivers

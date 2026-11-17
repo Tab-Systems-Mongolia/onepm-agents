@@ -113,6 +113,7 @@ describe("loadProjectContext", () => {
     });
 
     assert.equal(context.self.id, "agent-1");
+    assert.deepEqual(context.finalStatuses, ["done"]);
     assert.match(context.summary, /Tab-Systems-Mongolia\/onepm-agents/);
     assert.match(context.summary, /in-progress/);
     for (const name of ["project", "columns", "repositories"]) {
@@ -133,6 +134,19 @@ describe("loadProjectContext", () => {
 
     assert.match(context.summary, /OnePM/);
     assert.doesNotMatch(context.summary, /GitHub/);
+  });
+
+  it("has no final statuses when the columns can't be read", async () => {
+    const client = fakeClient({
+      columns: () => Promise.reject(new Error("HTTP 403")),
+    });
+    const context = await loadProjectContext({
+      client,
+      timeoutMs: 1000,
+      log: silent,
+    });
+
+    assert.equal(context.finalStatuses, null);
   });
 
   it("gives up after the timeout and logs why", async () => {

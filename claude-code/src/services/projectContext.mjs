@@ -25,8 +25,13 @@ export const loadProjectContext = async ({ client, timeoutMs, log }) => {
       client.columns(self.projectId, init),
       client.repositories(self.projectId, init),
     ]);
+    const statuses = settled(columns);
     return {
       self,
+      // Slugs of the final columns, or null when they couldn't be read.
+      finalStatuses: Array.isArray(statuses)
+        ? statuses.filter((column) => column.isFinal).map(({ slug }) => slug)
+        : null,
       summary: formatProjectContext({
         self,
         project: settled(project),

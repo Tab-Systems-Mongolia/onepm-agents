@@ -19,7 +19,7 @@ export const createBusyTracker = ({
   maxMs = BUSY_MAX_MS,
 }) => {
   const refreshing = new Map();
-  // When each task's latest event arrived: a new one waits the full time.
+  // When each task's mark was last extended: a new one waits its full time.
   const startedAt = new Map();
   // How long each task refreshes from startedAt.
   const capOf = new Map();
@@ -53,8 +53,16 @@ export const createBusyTracker = ({
   const start = (taskId, capMs = maxMs) => {
     if (!supported) return;
     send(taskId, true);
-    startedAt.set(taskId, now());
-    capOf.set(taskId, capMs);
+    // Keep whichever mark lasts longer: a brief one for a new event must not
+    // cut short work the agent already said it does.
+    const at = now();
+    const current = startedAt.has(taskId)
+      ? (startedAt.get(taskId) ?? 0) + (capOf.get(taskId) ?? maxMs)
+      : 0;
+    if (at + capMs >= current) {
+      startedAt.set(taskId, at);
+      capOf.set(taskId, capMs);
+    }
     if (refreshing.has(taskId)) return;
     const timer = timers.setInterval(() => {
       if (

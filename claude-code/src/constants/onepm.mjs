@@ -53,6 +53,10 @@ export const NOT_FOUND_STATUS = 404;
 // more often than that, until the reply is posted or a turn has surely ended.
 export const BUSY_REFRESH_MS = 15_000;
 export const BUSY_MAX_MS = 600_000;
+// A delivered event marks its task only briefly: an agent that works on it
+// says so (a working reply, set_working, a status move) and keeps the mark;
+// one it won't answer clears soon instead of after BUSY_MAX_MS.
+export const BUSY_DELIVERY_MAX_MS = 120_000;
 // How long a task the agent says it works on stays busy without a new
 // event or set_working call: long work, but a mark never outlives it for good.
 export const BUSY_WORKING_MAX_MS = 7_200_000;
