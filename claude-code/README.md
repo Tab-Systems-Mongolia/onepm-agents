@@ -243,6 +243,13 @@ its name and key, the board's statuses in order, and its GitHub repositories
 starts and waits at most 3 seconds; without it, the session starts with the
 plain instructions.
 
+From 0.8.7 the instructions ask Claude to put a task it creates in the
+project's active sprint, with story points, unless told otherwise
+(`create_task` takes `milestoneIds` and `storyPoints`; the agent needs the
+`pm:milestones` and `pm:refine` scopes for them). A task the agent creates
+for itself to work on is assigned to the agent, so per-member reports count
+it for the right person.
+
 **Don't use your personal OnePM MCP server in an agent's session.** If you
 added OnePM's MCP server to Claude Code with your own login or API key, it
 acts as you, across every project you can reach, and ignores the agent's
